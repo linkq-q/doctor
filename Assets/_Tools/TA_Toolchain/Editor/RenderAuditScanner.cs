@@ -363,8 +363,6 @@ namespace TA.Toolchain.RenderAudit
         {
             var thresholds = config.thresholds;
             var meshItems = new List<MeshOffender>();
-            var unreadableMeshFilterCount = 0;
-            var unreadableSkinnedMeshCount = 0;
 
             foreach (var mf in UnityEngine.Object.FindObjectsOfType<MeshFilter>(true))
             {
@@ -374,17 +372,11 @@ namespace TA.Toolchain.RenderAudit
                     continue;
                 }
 
-                if (!TryGetTriangleCount(mesh, out var triangleCount))
-                {
-                    unreadableMeshFilterCount++;
-                    continue;
-                }
-
                 meshItems.Add(new MeshOffender
                 {
                     name = mesh.name,
                     hierarchyPath = GetHierarchyPath(mf.transform),
-                    triangles = triangleCount,
+                    triangles = mesh.triangles.Length / 3,
                     vertices = mesh.vertexCount
                 });
             }
@@ -397,17 +389,11 @@ namespace TA.Toolchain.RenderAudit
                     continue;
                 }
 
-                if (!TryGetTriangleCount(mesh, out var triangleCount))
-                {
-                    unreadableSkinnedMeshCount++;
-                    continue;
-                }
-
                 meshItems.Add(new MeshOffender
                 {
                     name = mesh.name,
                     hierarchyPath = GetHierarchyPath(smr.transform),
-                    triangles = triangleCount,
+                    triangles = mesh.triangles.Length / 3,
                     vertices = mesh.vertexCount
                 });
             }
@@ -435,36 +421,6 @@ namespace TA.Toolchain.RenderAudit
                 .ThenBy(m => m.hierarchyPath, StringComparer.Ordinal)
                 .Take(Math.Max(1, thresholds.topNMeshes))
                 .ToList();
-
-            var totalUnreadableMeshes = unreadableMeshFilterCount + unreadableSkinnedMeshCount;
-            if (totalUnreadableMeshes > 0)
-            {
-                AddIssue(result, NewInfo(
-                    IssueCategory.Performance,
-                    "Skipped non-readable meshes during triangle scan",
-                    $"Skipped {totalUnreadableMeshes} mesh reference(s) because Read/Write is disabled or triangle data could not be read ({unreadableMeshFilterCount} MeshFilter, {unreadableSkinnedMeshCount} SkinnedMeshRenderer).",
-                    TargetType.ProjectSetting,
-                    "Mesh Import Settings"));
-            }
-        }
-
-        private static bool TryGetTriangleCount(Mesh mesh, out int triangleCount)
-        {
-            triangleCount = 0;
-            if (!mesh.isReadable)
-            {
-                return false;
-            }
-
-            try
-            {
-                triangleCount = mesh.triangles.Length / 3;
-                return true;
-            }
-            catch (UnityException)
-            {
-                return false;
-            }
         }
 
         private static void ScanMissingScripts(RenderAuditConfig config, RenderAuditScanResult result)

@@ -18,20 +18,6 @@ namespace TA.Toolchain.RenderAudit
         private int _selectedIndex = -1;
         private string _lastReportPath;
 
-        private const string ApiKeyPrefs = "TA_TOOLCHAIN_DEEPSEEK_API_KEY";
-        private bool _aiFoldout = true;
-        private string _aiApiKey = string.Empty;
-        private string _aiEndpoint = "https://api.deepseek.com/chat/completions";
-        private string _aiModel = "deepseek-reasoner";
-        private float _aiTemperature = 0.2f;
-        private int _aiTimeoutSeconds = 20;
-        private int _aiMaxTokens = 320;
-        private int _aiMaxInputChars = 12000;
-        private string _aiStatus = "Ready";
-        private string _aiOutput = string.Empty;
-        private string _latestReportAbsolutePath = string.Empty;
-        private string _latestReportInfo = "No report found.";
-
         private enum IssueSeverityFilter
         {
             All,
@@ -44,12 +30,6 @@ namespace TA.Toolchain.RenderAudit
         public static void Open()
         {
             GetWindow<RenderAuditWindow>("Render Audit");
-        }
-
-        private void OnEnable()
-        {
-            _aiApiKey = EditorPrefs.GetString(ApiKeyPrefs, string.Empty);
-            RefreshLatestReportInfo();
         }
 
         private void OnGUI()
@@ -87,7 +67,6 @@ namespace TA.Toolchain.RenderAudit
             DrawSummary();
             DrawResults();
             DrawTopOffenders();
-            DrawAISummarySection();
 
             if (!string.IsNullOrEmpty(_lastReportPath))
             {
@@ -184,7 +163,6 @@ namespace TA.Toolchain.RenderAudit
         {
             _scanResult = RenderAuditScanner.Scan(_config);
             _lastReportPath = ReportWriter.WriteReport(_scanResult.report, _config.outputDir);
-            RefreshLatestReportInfo();
             Repaint();
         }
 
@@ -236,96 +214,6 @@ namespace TA.Toolchain.RenderAudit
 
                 return true;
             }).ToList();
-        }
-
-
-        private void DrawAISummarySection()
-        {
-            EditorGUILayout.Space();
-            _aiFoldout = EditorGUILayout.Foldout(_aiFoldout, "AI Summary (DeepSeek)", true);
-            if (!_aiFoldout)
-            {
-                return;
-            }
-
-            EditorGUILayout.LabelField($"Status: {_aiStatus}");
-            EditorGUILayout.LabelField($"Report: {_latestReportInfo}");
-
-            var newKey = EditorGUILayout.PasswordField("API Key", _aiApiKey);
-            if (!string.Equals(newKey, _aiApiKey, StringComparison.Ordinal))
-            {
-                _aiApiKey = newKey;
-                EditorPrefs.SetString(ApiKeyPrefs, _aiApiKey ?? string.Empty);
-            }
-
-            _aiEndpoint = EditorGUILayout.TextField("Endpoint", _aiEndpoint);
-            _aiModel = EditorGUILayout.TextField("Model", _aiModel);
-            _aiTemperature = EditorGUILayout.Slider("Temperature", _aiTemperature, 0f, 1f);
-            _aiTimeoutSeconds = EditorGUILayout.IntField("Timeout Seconds", _aiTimeoutSeconds);
-            _aiMaxTokens = EditorGUILayout.IntField("Max Tokens", _aiMaxTokens);
-            _aiMaxInputChars = EditorGUILayout.IntField("Max Input Chars", _aiMaxInputChars);
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("生成AI精简建议", GUILayout.Height(24)))
-                {
-                    GenerateAISummary();
-                }
-
-                if (GUILayout.Button("刷新报告选择", GUILayout.Height(24)))
-                {
-                    RefreshLatestReportInfo();
-                }
-            }
-
-            EditorGUILayout.LabelField("输出（可复制）");
-            _aiOutput = EditorGUILayout.TextArea(_aiOutput, GUILayout.MinHeight(120));
-        }
-
-        private void GenerateAISummary()
-        {
-            RefreshLatestReportInfo();
-            if (string.IsNullOrEmpty(_latestReportAbsolutePath))
-            {
-                _aiStatus = "Failed -> Fallback";
-                _aiOutput = RenderAuditLocalFallback.Build(string.Empty);
-                return;
-            }
-
-            _aiStatus = "Calling...";
-            _aiOutput = string.Empty;
-
-            var settings = new RenderAuditAISummarizer.Settings
-            {
-                apiKey = _aiApiKey,
-                endpoint = _aiEndpoint,
-                model = _aiModel,
-                temperature = _aiTemperature,
-                timeoutSeconds = Mathf.Max(1, _aiTimeoutSeconds),
-                maxTokens = Mathf.Max(64, _aiMaxTokens),
-                maxInputChars = Mathf.Max(1000, _aiMaxInputChars)
-            };
-
-            RenderAuditAISummarizer.Generate(_latestReportAbsolutePath, settings, (text, error) =>
-            {
-                _aiOutput = text ?? string.Empty;
-                _aiStatus = string.IsNullOrWhiteSpace(error) ? "Ready" : "Failed -> Fallback";
-                Repaint();
-            });
-        }
-
-        private void RefreshLatestReportInfo()
-        {
-            if (RenderAuditAISummarizer.TryGetLatestReportAbsolutePath(out var absolutePath, out var fileName, out var sizeBytes))
-            {
-                _latestReportAbsolutePath = absolutePath;
-                _latestReportInfo = $"{fileName} ({sizeBytes / 1024f:F1} KB)";
-            }
-            else
-            {
-                _latestReportAbsolutePath = string.Empty;
-                _latestReportInfo = "No report found in Assets/_Tools/TA_Toolchain/Reports";
-            }
         }
 
         private static string FormatBytes(long bytes)
