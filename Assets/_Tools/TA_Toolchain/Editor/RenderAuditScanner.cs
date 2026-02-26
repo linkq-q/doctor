@@ -367,7 +367,7 @@ namespace TA.Toolchain.RenderAudit
             foreach (var mf in UnityEngine.Object.FindObjectsOfType<MeshFilter>(true))
             {
                 var mesh = mf.sharedMesh;
-                if (mesh == null)
+                if (mesh == null || !TryGetTriangleCount(mesh, out var triangleCount))
                 {
                     continue;
                 }
@@ -376,7 +376,7 @@ namespace TA.Toolchain.RenderAudit
                 {
                     name = mesh.name,
                     hierarchyPath = GetHierarchyPath(mf.transform),
-                    triangles = mesh.triangles.Length / 3,
+                    triangles = triangleCount,
                     vertices = mesh.vertexCount
                 });
             }
@@ -384,7 +384,7 @@ namespace TA.Toolchain.RenderAudit
             foreach (var smr in UnityEngine.Object.FindObjectsOfType<SkinnedMeshRenderer>(true))
             {
                 var mesh = smr.sharedMesh;
-                if (mesh == null)
+                if (mesh == null || !TryGetTriangleCount(mesh, out var triangleCount))
                 {
                     continue;
                 }
@@ -393,7 +393,7 @@ namespace TA.Toolchain.RenderAudit
                 {
                     name = mesh.name,
                     hierarchyPath = GetHierarchyPath(smr.transform),
-                    triangles = mesh.triangles.Length / 3,
+                    triangles = triangleCount,
                     vertices = mesh.vertexCount
                 });
             }
@@ -421,6 +421,25 @@ namespace TA.Toolchain.RenderAudit
                 .ThenBy(m => m.hierarchyPath, StringComparer.Ordinal)
                 .Take(Math.Max(1, thresholds.topNMeshes))
                 .ToList();
+        }
+
+        private static bool TryGetTriangleCount(Mesh mesh, out int triangleCount)
+        {
+            triangleCount = 0;
+            if (!mesh.isReadable)
+            {
+                return false;
+            }
+
+            try
+            {
+                triangleCount = mesh.triangles.Length / 3;
+                return true;
+            }
+            catch (UnityException)
+            {
+                return false;
+            }
         }
 
         private static void ScanMissingScripts(RenderAuditConfig config, RenderAuditScanResult result)
