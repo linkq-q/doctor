@@ -363,12 +363,20 @@ namespace TA.Toolchain.RenderAudit
         {
             var thresholds = config.thresholds;
             var meshItems = new List<MeshOffender>();
+            var unreadableMeshFilterCount = 0;
+            var unreadableSkinnedMeshCount = 0;
 
             foreach (var mf in UnityEngine.Object.FindObjectsOfType<MeshFilter>(true))
             {
                 var mesh = mf.sharedMesh;
-                if (mesh == null || !TryGetTriangleCount(mesh, out var triangleCount))
+                if (mesh == null)
                 {
+                    continue;
+                }
+
+                if (!TryGetTriangleCount(mesh, out var triangleCount))
+                {
+                    unreadableMeshFilterCount++;
                     continue;
                 }
 
@@ -384,8 +392,14 @@ namespace TA.Toolchain.RenderAudit
             foreach (var smr in UnityEngine.Object.FindObjectsOfType<SkinnedMeshRenderer>(true))
             {
                 var mesh = smr.sharedMesh;
-                if (mesh == null || !TryGetTriangleCount(mesh, out var triangleCount))
+                if (mesh == null)
                 {
+                    continue;
+                }
+
+                if (!TryGetTriangleCount(mesh, out var triangleCount))
+                {
+                    unreadableSkinnedMeshCount++;
                     continue;
                 }
 
@@ -421,6 +435,17 @@ namespace TA.Toolchain.RenderAudit
                 .ThenBy(m => m.hierarchyPath, StringComparer.Ordinal)
                 .Take(Math.Max(1, thresholds.topNMeshes))
                 .ToList();
+
+            var totalUnreadableMeshes = unreadableMeshFilterCount + unreadableSkinnedMeshCount;
+            if (totalUnreadableMeshes > 0)
+            {
+                AddIssue(result, NewInfo(
+                    IssueCategory.Performance,
+                    "Skipped non-readable meshes during triangle scan",
+                    $"Skipped {totalUnreadableMeshes} mesh reference(s) because Read/Write is disabled or triangle data could not be read ({unreadableMeshFilterCount} MeshFilter, {unreadableSkinnedMeshCount} SkinnedMeshRenderer).",
+                    TargetType.ProjectSetting,
+                    "Mesh Import Settings"));
+            }
         }
 
         private static bool TryGetTriangleCount(Mesh mesh, out int triangleCount)
