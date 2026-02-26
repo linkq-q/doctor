@@ -12,6 +12,7 @@ namespace TA.Toolchain.RenderAudit
         private RenderAuditConfig _config;
         private RenderAuditScanResult _scanResult;
         private Vector2 _scroll;
+        private Vector2 _windowScroll;
         private IssueSeverityFilter _severityFilter = IssueSeverityFilter.All;
         private string _categoryFilter = "All";
         private string _search = string.Empty;
@@ -63,6 +64,7 @@ namespace TA.Toolchain.RenderAudit
                 GUI.enabled = true;
             }
 
+            _windowScroll = EditorGUILayout.BeginScrollView(_windowScroll);
             DrawFilters();
             DrawSummary();
             DrawResults();
@@ -72,6 +74,7 @@ namespace TA.Toolchain.RenderAudit
             {
                 EditorGUILayout.HelpBox($"Last report: {_lastReportPath}", MessageType.None);
             }
+            EditorGUILayout.EndScrollView();
         }
 
         private void DrawFilters()
@@ -118,7 +121,7 @@ namespace TA.Toolchain.RenderAudit
             EditorGUILayout.LabelField("Issues", EditorStyles.boldLabel);
 
             var filtered = FilterEntries(_scanResult.entries);
-            _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.MinHeight(220));
+            _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.Height(220));
             for (var i = 0; i < filtered.Count; i++)
             {
                 var entry = filtered[i];
