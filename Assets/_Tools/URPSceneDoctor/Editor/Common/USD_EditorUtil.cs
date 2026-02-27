@@ -1,0 +1,95 @@
+using System;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+namespace URPSceneDoctor.Editor
+{
+    public static class USD_EditorUtil
+    {
+        public static readonly string RootFolder = "Assets/_Tools/URPSceneDoctor";
+
+        public static string Timestamp => DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+        public static void EnsureFolder(string folder)
+        {
+            if (AssetDatabase.IsValidFolder(folder)) return;
+
+            var parts = folder.Split('/');
+            var current = parts[0];
+            for (var i = 1; i < parts.Length; i++)
+            {
+                var next = current + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                {
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                }
+
+                current = next;
+            }
+        }
+
+        public static string EnsureSceneSubFolder(string category, string sceneName)
+        {
+            var safeScene = string.IsNullOrWhiteSpace(sceneName) ? "UntitledScene" : sceneName;
+            var path = $"{RootFolder}/{category}/{safeScene}";
+            EnsureFolder(path);
+            return path;
+        }
+
+        public static string MakeBackup(string assetPath)
+        {
+            if (!File.Exists(assetPath)) return string.Empty;
+            var backupPath = assetPath + ".bak_" + Timestamp;
+            File.Copy(assetPath, backupPath, true);
+            AssetDatabase.Refresh();
+            return backupPath;
+        }
+
+        public static void VerboseLog(string message)
+        {
+            var settings = USD_Settings.GetOrCreateSettings();
+            if (settings != null && settings.verboseLogs)
+            {
+                Debug.Log("[URP Scene Doctor] " + message);
+            }
+        }
+
+        public static void RegisterCreatedObject(UnityEngine.Object obj, string action)
+        {
+            // We always register created objects for Undo so users can safely rollback Apply operations.
+            Undo.RegisterCreatedObjectUndo(obj, action);
+            EditorUtility.SetDirty(obj);
+        }
+
+        public static void RecordObject(UnityEngine.Object obj, string action)
+        {
+            // We record existing object modifications separately to make Undo deterministic.
+            Undo.RecordObject(obj, action);
+            EditorUtility.SetDirty(obj);
+        }
+    }
+
+    public sealed class USD_Settings : ScriptableObject
+    {
+        public string reportsRoot = "Assets/_Tools/URPSceneDoctor/Reports";
+        public string snapshotsRoot = "Assets/_Tools/URPSceneDoctor/Snapshots";
+        public string patchesRoot = "Assets/_Tools/URPSceneDoctor/Patches";
+        public string defaultRulePackPath = "Assets/_Tools/URPSceneDoctor/Config/RulePacks/DefaultRulePack.json";
+        public bool verboseLogs;
+        public float defaultApplyStrength = 1f;
+
+        public static USD_Settings GetOrCreateSettings()
+        {
+            const string settingsPath = "Assets/_Tools/URPSceneDoctor/Config/USD_Settings.asset";
+            var settings = AssetDatabase.LoadAssetAtPath<USD_Settings>(settingsPath);
+            if (settings != null) return settings;
+
+            USD_EditorUtil.EnsureFolder("Assets/_Tools/URPSceneDoctor/Config");
+            settings = CreateInstance<USD_Settings>();
+            AssetDatabase.CreateAsset(settings, settingsPath);
+            AssetDatabase.SaveAssets();
+            return settings;
+        }
+    }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "Default Atmos RulePack",
+  "version": "0.1",
+  "description": "Atmosphere-first heuristic rule pack for URP Scene Doctor.",
+  "rules": [
+    {
+      "id": "R-P0-01",
+      "title": "主光/阴影贡献不足",
+      "severity": "P0",
+      "category": "Atmos",
+      "triggers": [
+        { "field": "Lighting.hasDirectionalLight", "op": "==", "value": "False" }
+      ],
+      "symptoms": ["场景缺少明确主光或阴影贡献极低"],
+      "diagnosisTemplate": "Primary light definition is missing, flattening scene readability.",
+      "prescriptions": [
+        { "priority": 1, "actionText": "建立主方向光并启用合理阴影", "targetPathHint": "Lighting > Directional Light", "recommendedRange": "PC: shadow strength 0.6-0.9; Mobile: 0.4-0.7", "alternatives": ["使用烘焙主光作为替代"] }
+      ],
+      "verificationTemplate": ["在同机位对比前后主体轮廓", "确认阴影不过黑且方向统一"],
+      "applyActionsTemplate": []
+    },
+    {
+      "id": "R-P0-02",
+      "title": "缺 Global Volume / 无统一后处理",
+      "severity": "P0",
+      "category": "Atmos",
+      "triggers": [{ "field": "Volumes.hasGlobalVolume", "op": "==", "value": "False" }],
+      "symptoms": ["后处理策略缺失"],
+      "diagnosisTemplate": "No global post stack baseline for scene tone management.",
+      "prescriptions": [
+        { "priority": 1, "actionText": "创建 Global Volume Profile 基线", "targetPathHint": "Scene > Global Volume", "recommendedRange": "Tonemapping: Neutral default", "alternatives": ["ACES for cinematic grading"] }
+      ],
+      "verificationTemplate": ["检查高光压制和中灰层次一致性"],
+      "applyActionsTemplate": [
+        { "type": "CreateAsset", "payloadJson": "{\"kind\":\"VolumeProfile\"}", "requiresUserOptIn": false },
+        { "type": "AssignVolumeProfile", "payloadJson": "{\"target\":\"GlobalVolume\"}", "requiresUserOptIn": false }
+      ]
+    },
+    {
+      "id": "R-P0-03",
+      "title": "中景层次弱",
+      "severity": "P0",
+      "category": "Atmos",
+      "triggers": [
+        { "field": "Lighting.dirLightShadowsEnabled", "op": "==", "value": "False" },
+        { "field": "Lighting.ambientIntensity", "op": ">", "value": "1.1" },
+        { "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "ColorAdjustments" }
+      ],
+      "symptoms": ["中景区域灰平", "主体与背景分离不足"],
+      "diagnosisTemplate": "Mid-ground depth cues are weak due to weak shadow + uncontrolled tone.",
+      "prescriptions": [{ "priority": 1, "actionText": "降低环境光并补充轻量色调控制", "targetPathHint": "Lighting / Volume", "recommendedRange": "Ambient intensity 0.7-1.0", "alternatives": ["用局部灯补轮廓"] }],
+      "verificationTemplate": ["中景物体边缘可读性提升"]
+    },
+    {
+      "id": "R-P0-04",
+      "title": "反射/环境缺失",
+      "severity": "P0",
+      "category": "Atmos",
+      "triggers": [
+        { "field": "Lighting.hasAnyReflectionProbe", "op": "==", "value": "False" },
+        { "field": "Lighting.hasSkyboxMaterial", "op": "==", "value": "False" }
+      ],
+      "symptoms": ["材质反射反馈弱", "空间包裹感不足"],
+      "diagnosisTemplate": "Reflection context is missing for plausible PBR response.",
+      "prescriptions": [{ "priority": 1, "actionText": "至少补一套 skybox/probe 方案", "targetPathHint": "Lighting > Environment", "recommendedRange": "1+ reflection probe for hero area", "alternatives": ["临时使用默认天空盒"] }],
+      "verificationTemplate": ["金属与高光材质反应更稳定"]
+    },
+    {
+      "id": "R-P1-01", "title": "空气感/远景贴片", "severity": "P1", "category": "Atmos",
+      "triggers": [{ "field": "Scene.materialCountDistinct", "op": ">", "value": "120" }, { "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "DepthOfField" }],
+      "symptoms": ["远景拼贴感明显"], "diagnosisTemplate": "No distance-based atmospheric separation proxy detected.",
+      "prescriptions": [{ "priority": 1, "actionText": "补充远景空气透视策略", "targetPathHint": "Fog/Volume", "recommendedRange": "轻度雾化或对比衰减", "alternatives": ["材质层级降对比"] }],
+      "verificationTemplate": ["远景不过度抢眼，主体更突出"]
+    },
+    { "id": "R-P1-02", "title": "色温不明确", "severity": "P1", "category": "Atmos", "triggers": [{ "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "WhiteBalance" }], "symptoms": ["全局色温漂移"], "diagnosisTemplate": "White balance anchor is missing.", "prescriptions": [{ "priority": 1, "actionText": "给出白平衡锚点", "targetPathHint": "Volume > WhiteBalance", "recommendedRange": "temperature -10~+10", "alternatives": ["主灯色温统一"] }], "verificationTemplate": ["白灰区域不偏色"] },
+    { "id": "R-P1-03", "title": "饱和策略混乱", "severity": "P1", "category": "Atmos", "triggers": [{ "field": "Scene.shaderCountDistinct", "op": ">", "value": "40" }, { "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "ColorAdjustments" }], "symptoms": ["画面饱和不统一"], "diagnosisTemplate": "Color authority is weak with fragmented material ecosystem.", "prescriptions": [{ "priority": 1, "actionText": "建立统一饱和度策略", "targetPathHint": "Volume > ColorAdjustments", "recommendedRange": "global saturation -5~+5", "alternatives": ["按区域 LUT"] }], "verificationTemplate": ["同类材质观感一致"] },
+    { "id": "R-P1-04", "title": "Bloom/Vignette 味精过量", "severity": "P1", "category": "Atmos", "triggers": [{ "field": "Volumes.enabledOverridesCount", "op": ">", "value": "7" }, { "field": "Volumes.enabledOverrides", "op": "contains", "value": "Bloom" }], "symptoms": ["效果堆叠疑似过多"], "diagnosisTemplate": "Post stack may be over-seasoned.", "prescriptions": [{ "priority": 1, "actionText": "逐项回退 Bloom/Vignette 强度", "targetPathHint": "Volume > Bloom/Vignette", "recommendedRange": "先减半再评估", "alternatives": ["只保留一项风格效果"] }], "verificationTemplate": ["高亮不过曝，边缘不过暗"] },
+    { "id": "R-P1-05", "title": "材质/Shader 家族太杂", "severity": "P1", "category": "Atmos", "triggers": [{ "field": "Scene.shaderCountDistinct", "op": ">", "value": "50" }], "symptoms": ["风格碎片化"], "diagnosisTemplate": "Too many shader families break coherence.", "prescriptions": [{ "priority": 1, "actionText": "收敛到主 shader 家族", "targetPathHint": "Materials/Shaders", "recommendedRange": "hero + secondary families <= 3", "alternatives": ["按关卡主题收敛"] }], "verificationTemplate": ["整体材质语言统一"] },
+    { "id": "R-P1-06", "title": "主体可读性差", "severity": "P1", "category": "Atmos", "triggers": [{ "field": "Scene.transparentRendererCount", "op": ">", "value": "100" }, { "field": "Lighting.dirLightShadowsEnabled", "op": "==", "value": "False" }], "symptoms": ["主体轮廓容易淹没"], "diagnosisTemplate": "Transparency layering + weak shadow harms silhouette readability.", "prescriptions": [{ "priority": 1, "actionText": "先修轮廓光与阴影，再控制透明层", "targetPathHint": "Lighting/FX", "recommendedRange": "transparent pass budget by platform", "alternatives": ["前景透明降密"] }], "verificationTemplate": ["主体三机位可读"] },
+    { "id": "R-P2-01", "title": "轻微锐化/细节回拉", "severity": "P2", "category": "Atmos", "triggers": [{ "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "Tonemapping" }], "symptoms": ["细节可能偏软"], "diagnosisTemplate": "Mild detail pull-back may help micro-contrast.", "prescriptions": [{ "priority": 2, "actionText": "仅做轻微锐化建议", "targetPathHint": "Post process", "recommendedRange": "subtle only", "alternatives": ["保持当前"] }], "verificationTemplate": ["纹理细节不出现边缘光晕"] },
+    { "id": "R-P2-02", "title": "LUT 统一", "severity": "P2", "category": "Atmos", "triggers": [{ "field": "Volumes.enabledOverrides", "op": "not_contains", "value": "ColorLookup" }], "symptoms": ["缺少全局色彩收口"], "diagnosisTemplate": "A LUT pass can align scene color language.", "prescriptions": [{ "priority": 2, "actionText": "建议后续引入 LUT 统一", "targetPathHint": "Volume > ColorLookup", "recommendedRange": "neutral LUT first", "alternatives": ["继续使用基础白平衡"] }], "verificationTemplate": ["多区域切换时色彩一致"] }
+  ]
+}
