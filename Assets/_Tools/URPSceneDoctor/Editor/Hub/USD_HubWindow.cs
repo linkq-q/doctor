@@ -7,15 +7,16 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.4";
+        public const string ToolVersion = "v0.45";
 
-        private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Evidence Pack", "Delta Library", "Reports", "Settings" };
+        private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Evidence Pack", "Delta Library", "Pipeline Pack", "Reports", "Settings" };
         private int _selectedTab;
         private USD_AtmosAuditModule _atmosModule;
         private USD_RenderAuditModule _renderModule;
         private USD_TuningModule _tuningModule;
         private USD_EvidencePackModule _evidenceModule;
         private USD_DeltaLibraryModule _deltaLibraryModule;
+        private USD_PipelinePackModule _pipelinePackModule;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
         private USD_ApplyMode _applyMode = USD_ApplyMode.SafeNeutral;
@@ -59,6 +60,8 @@ namespace URPSceneDoctor.Editor
             _tuningModule = new USD_TuningModule();
             _evidenceModule = new USD_EvidencePackModule();
             _deltaLibraryModule = new USD_DeltaLibraryModule();
+            _pipelinePackModule = new USD_PipelinePackModule();
+
             var settings = USD_Settings.GetOrCreateSettings();
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
             _screenshotWidth = settings.screenshotWidth;
@@ -94,21 +97,14 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.HelpBox($"URP Scene Doctor {ToolVersion} | Scene: {ActiveSceneName} | URP: {snapshot.activeURPAssetName} | Renderer: {snapshot.activeRendererDataName} | Global Volume: {snapshot.hasGlobalVolume}", MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Refresh Header", GUILayout.Width(130)))
-            {
-                RefreshHeaderSnapshot(true);
-            }
-
+            if (GUILayout.Button("Refresh Header", GUILayout.Width(130))) RefreshHeaderSnapshot(true);
             if (GUILayout.Button("Open Demo Scene", GUILayout.Width(150)))
             {
                 USD_DemoSceneUtil.OpenOrCreateDemoSceneWithPrompt();
                 RefreshHeaderSnapshot(true);
             }
 
-            if (GUILayout.Button("Quick Verify", GUILayout.Width(150)))
-            {
-                RunQuickVerify();
-            }
+            if (GUILayout.Button("Quick Verify", GUILayout.Width(150))) RunQuickVerify();
             EditorGUILayout.EndHorizontal();
         }
 
@@ -131,27 +127,14 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.BeginVertical();
             switch (_selectedTab)
             {
-                case 0:
-                    _atmosModule.DrawUI(this);
-                    break;
-                case 1:
-                    _renderModule.DrawUI(this);
-                    break;
-                case 2:
-                    _tuningModule.DrawUI(this);
-                    break;
-                case 3:
-                    _evidenceModule.DrawUI(this);
-                    break;
-                case 4:
-                    _deltaLibraryModule.DrawUI(this);
-                    break;
-                case 5:
-                    DrawReports();
-                    break;
-                case 6:
-                    DrawSettings();
-                    break;
+                case 0: _atmosModule.DrawUI(this); break;
+                case 1: _renderModule.DrawUI(this); break;
+                case 2: _tuningModule.DrawUI(this); break;
+                case 3: _evidenceModule.DrawUI(this); break;
+                case 4: _deltaLibraryModule.DrawUI(this); break;
+                case 5: _pipelinePackModule.DrawUI(this); break;
+                case 6: DrawReports(); break;
+                case 7: DrawSettings(); break;
             }
 
             if (_lastResult != null)
@@ -176,10 +159,7 @@ namespace URPSceneDoctor.Editor
             if (GUILayout.Button("Export Report") && _lastResult != null) ExportLastReport();
             EditorGUILayout.EndHorizontal();
 
-            if (module.ModuleName == "Atmosphere Doctor")
-            {
-                DrawApplyOptions();
-            }
+            if (module.ModuleName == "Atmosphere Doctor") DrawApplyOptions();
         }
 
         private void DrawApplyOptions()
@@ -195,9 +175,7 @@ namespace URPSceneDoctor.Editor
             }
 
             _selectedStyleIndex = _styleProfiles.Length == 0 ? 0 : Mathf.Clamp(EditorGUILayout.Popup("Style Profile", _selectedStyleIndex, names), 0, _styleProfiles.Length - 1);
-            _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft(
-                "Assign new profile to existing Global Volume (default OFF)",
-                _assignNewProfileToExistingGlobalVolume);
+            _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft("Assign new profile to existing Global Volume (default OFF)", _assignNewProfileToExistingGlobalVolume);
         }
 
         private void RunModule(IToolModule module, USD_RunMode mode, bool saveSnapshot)
@@ -304,10 +282,7 @@ namespace URPSceneDoctor.Editor
             RunModule(_atmosModule, USD_RunMode.Scan, true);
             var hitCount = _lastResult != null ? _lastResult.WorkOrders.Count : 0;
             var warningCount = _lastResult != null ? _lastResult.Warnings.Count : 0;
-            EditorUtility.DisplayDialog(
-                "Quick Verify Complete",
-                $"Report Path: {LastReportPath}\nMatched Rules: {hitCount}\nWarnings: {warningCount}",
-                "OK");
+            EditorUtility.DisplayDialog("Quick Verify Complete", $"Report Path: {LastReportPath}\nMatched Rules: {hitCount}\nWarnings: {warningCount}", "OK");
         }
 
         public void SetLearningStats(USD_DeltaStats stats)
