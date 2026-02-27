@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace URPSceneDoctor.Editor
 {
@@ -39,14 +40,26 @@ namespace URPSceneDoctor.Editor
             AssetDatabase.CreateAsset(profile, profilePath);
             USD_EditorUtil.RecordObject(profile, "Configure USD Volume Profile");
 
-            var tonemapping = profile.Add<Tonemapping>(true);
-            tonemapping.mode.Override(TonemappingMode.Neutral);
-            var colorAdj = profile.Add<ColorAdjustments>(true);
-            colorAdj.contrast.Override(0f);
-            colorAdj.saturation.Override(0f);
-            var wb = profile.Add<WhiteBalance>(true);
-            wb.temperature.Override(0f);
-            wb.tint.Override(0f);
+            // 获取或创建 Tonemapping
+            if (!profile.TryGet(out Tonemapping tonemapping))
+                tonemapping = profile.Add<Tonemapping>(true);
+            tonemapping.mode.overrideState = true;
+            tonemapping.mode.value = TonemappingMode.Neutral;
+
+            // 获取或创建 ColorAdjustments
+            if (!profile.TryGet(out ColorAdjustments colorAdj))
+                colorAdj = profile.Add<ColorAdjustments>(true);
+            // 这里保持“中性”，不要强行风格化
+            colorAdj.contrast.overrideState = true;
+            colorAdj.contrast.value = 0f;
+            colorAdj.saturation.overrideState = true;
+            colorAdj.saturation.value = 0f;
+
+            // WhiteBalance（如果你有用）
+            if (!profile.TryGet(out WhiteBalance wb))
+                wb = profile.Add<WhiteBalance>(true);
+            wb.temperature.overrideState = true;
+            wb.temperature.value = 0f;
 
             if (!hadExistingGlobal || assignProfileToExistingGlobalVolume)
             {
