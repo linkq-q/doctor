@@ -7,16 +7,19 @@ namespace URPSceneDoctor.Editor
 {
     public static class USD_PatchApplier
     {
-        public static List<string> ApplySafeAtmospherePatch(string sceneName, string timestamp, bool replaceExistingBinding)
+        public static List<string> ApplySafeAtmospherePatch(string sceneName, string timestamp, bool assignProfileToExistingGlobalVolume)
         {
             var changes = new List<string>();
             var volumes = Object.FindObjectsByType<Volume>(FindObjectsSortMode.None);
             Volume global = null;
+            var hadExistingGlobal = false;
+
             foreach (var volume in volumes)
             {
                 if (volume != null && volume.isGlobal)
                 {
                     global = volume;
+                    hadExistingGlobal = true;
                     break;
                 }
             }
@@ -45,12 +48,7 @@ namespace URPSceneDoctor.Editor
             wb.temperature.Override(0f);
             wb.tint.Override(0f);
 
-            profile.TryGet(out Bloom bloom);
-            if (bloom != null) bloom.active = false;
-            profile.TryGet(out Vignette vignette);
-            if (vignette != null) vignette.active = false;
-
-            if (global.sharedProfile == null || replaceExistingBinding)
+            if (!hadExistingGlobal || assignProfileToExistingGlobalVolume)
             {
                 USD_EditorUtil.RecordObject(global, "Assign USD Volume Profile");
                 global.sharedProfile = profile;
@@ -58,7 +56,7 @@ namespace URPSceneDoctor.Editor
             }
             else
             {
-                changes.Add("Existing global volume profile retained; new profile generated only.");
+                changes.Add("Existing global volume kept unchanged (profile generated only, no rebind).");
             }
 
             changes.Add("Created VolumeProfile: " + profilePath);

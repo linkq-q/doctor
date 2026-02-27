@@ -143,7 +143,7 @@ namespace URPSceneDoctor.Editor
                 snapshot.warnings.Add("Failed to read renderer fields: " + e.Message);
             }
 
-            if (SceneManager.GetActiveScene().name == null)
+            if (!SceneManager.GetActiveScene().isLoaded || string.IsNullOrWhiteSpace(SceneManager.GetActiveScene().name))
             {
                 snapshot.warnings.Add("Active scene is unsaved.");
             }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using UnityEngine;
 
 namespace URPSceneDoctor.Editor
 {
@@ -31,15 +32,14 @@ namespace URPSceneDoctor.Editor
                     costNotes = string.IsNullOrEmpty(rule.notes) ? "Low to medium implementation cost." : rule.notes
                 };
                 wo.symptoms.AddRange(rule.symptoms);
-                wo.evidence.Add($"Trigger matched on snapshot for {rule.id}");
-                wo.evidence.Add($"hasGlobalVolume={snapshot.hasGlobalVolume}, enabledOverrides={snapshot.enabledOverrides.Count}, shaders={snapshot.shaderCountDistinct}");
+                wo.evidence.AddRange(BuildEvidence(snapshot, rule));
 
                 foreach (var p in rule.prescriptions)
                 {
                     var range = p.recommendedRange;
                     if (deltaPatch != null && deltaPatch.recommendedRanges.Count > 0)
                     {
-                        range += " | Based on your tuning delta: " + string.Join("; ", deltaPatch.recommendedRanges);
+                        range += " (Personal delta hint) " + string.Join("; ", deltaPatch.recommendedRanges);
                     }
 
                     wo.prescriptions.Add(new USD_Prescription
@@ -73,6 +73,19 @@ namespace URPSceneDoctor.Editor
             }
 
             return orders;
+        }
+
+        private static List<string> BuildEvidence(USD_ScanSnapshot snapshot, USD_Rule rule)
+        {
+            var evidence = new List<string> { $"Rule {rule.id} matched with {rule.triggers.Count} trigger(s)." };
+            foreach (var trigger in rule.triggers)
+            {
+                evidence.Add($"{trigger.field}={ResolveField(snapshot, trigger.field)} ({trigger.op} {trigger.value})");
+            }
+
+            evidence.Add($"GlobalVolume={snapshot.hasGlobalVolume}, Overrides={snapshot.enabledOverrides.Count}, ReflectionProbes={snapshot.reflectionProbeCount}");
+            evidence.Add($"RendererCount={snapshot.rendererCount}, ShaderCount={snapshot.shaderCountDistinct}, TransparentCount={snapshot.transparentRendererCount}");
+            return evidence;
         }
 
         private static bool MatchAll(USD_ScanSnapshot snapshot, List<USD_Trigger> triggers)

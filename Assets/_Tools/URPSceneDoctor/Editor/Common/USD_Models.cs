@@ -51,6 +51,7 @@ namespace URPSceneDoctor.Editor
         public bool hasManyDifferentShaders;
 
         public List<string> warnings = new List<string>();
+        public List<string> personalDeltaHints = new List<string>();
     }
 
     [Serializable]
@@ -98,6 +99,7 @@ namespace URPSceneDoctor.Editor
     [Serializable]
     public sealed class USD_Report
     {
+        public string toolVersion;
         public string module;
         public string sceneName;
         public string timestamp;
@@ -105,6 +107,7 @@ namespace URPSceneDoctor.Editor
         public List<USD_WorkOrder> workOrders = new List<USD_WorkOrder>();
         public List<string> appliedChanges = new List<string>();
         public List<string> warnings = new List<string>();
+        public List<string> personalDeltaHints = new List<string>();
     }
 
     [Serializable]

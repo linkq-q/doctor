@@ -10,6 +10,7 @@ namespace URPSceneDoctor.Editor
         public string BeforeSnapshotPath { get; private set; }
         public string AfterSnapshotPath { get; private set; }
         public string LastDeltaPatchPath { get; private set; }
+        public int LastChangedFieldsCount { get; private set; }
 
         public void DrawUI(USD_HubWindow hub)
         {
@@ -35,15 +36,31 @@ namespace URPSceneDoctor.Editor
                     var patch = USD_DeltaExtractor.Extract(hub.ActiveSceneName, BeforeSnapshotPath, AfterSnapshotPath);
                     if (patch != null)
                     {
+                        LastChangedFieldsCount = patch.changedFields.Count;
                         LastDeltaPatchPath = USD_SnapshotUtil.SaveDeltaPatch(hub.ActiveSceneName, USD_EditorUtil.Timestamp, patch);
                         hub.OptionalDeltaPatchPath = LastDeltaPatchPath;
                     }
                 }
             }
 
-            EditorGUILayout.LabelField("Before:", BeforeSnapshotPath ?? "(none)");
-            EditorGUILayout.LabelField("After:", AfterSnapshotPath ?? "(none)");
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Open Snapshot Folder"))
+            {
+                var folder = USD_EditorUtil.EnsureSceneSubFolder("Snapshots", hub.ActiveSceneName);
+                EditorUtility.RevealInFinder(folder);
+            }
+
+            if (GUILayout.Button("Open Patch Folder"))
+            {
+                var folder = USD_EditorUtil.EnsureSceneSubFolder("Patches", hub.ActiveSceneName);
+                EditorUtility.RevealInFinder(folder);
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.LabelField("Before Snapshot:", BeforeSnapshotPath ?? "(none)");
+            EditorGUILayout.LabelField("After Snapshot:", AfterSnapshotPath ?? "(none)");
             EditorGUILayout.LabelField("Delta Patch:", LastDeltaPatchPath ?? "(none)");
+            EditorGUILayout.LabelField("Delta Summary:", $"changed fields = {LastChangedFieldsCount}");
         }
 
         public USD_ModuleResult Execute(USD_RunContext context)
