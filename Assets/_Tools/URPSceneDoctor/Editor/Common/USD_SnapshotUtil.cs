@@ -9,7 +9,7 @@ namespace URPSceneDoctor.Editor
         public static string SaveSnapshot(string sceneName, string timestamp, USD_ScanSnapshot snapshot)
         {
             var folder = USD_EditorUtil.EnsureSceneSubFolder("Snapshots", sceneName);
-            var path = $"{folder}/{timestamp}_snapshot.json";
+            var path = USD_EditorUtil.EnsureUniqueAssetPath($"{folder}/{timestamp}_snapshot.json");
             File.WriteAllText(path, JsonUtility.ToJson(snapshot, true));
             AssetDatabase.Refresh();
             return path;
@@ -24,7 +24,7 @@ namespace URPSceneDoctor.Editor
         public static string SaveDeltaPatch(string sceneName, string timestamp, USD_DeltaPatch patch)
         {
             var folder = USD_EditorUtil.EnsureSceneSubFolder("Patches", sceneName);
-            var path = $"{folder}/{timestamp}_deltaPatch.json";
+            var path = USD_EditorUtil.EnsureUniqueAssetPath($"{folder}/{timestamp}_deltaPatch.json");
             File.WriteAllText(path, JsonUtility.ToJson(patch, true));
             AssetDatabase.Refresh();
             return path;

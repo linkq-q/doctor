@@ -9,7 +9,8 @@ namespace URPSceneDoctor.Editor
     {
         public static readonly string RootFolder = "Assets/_Tools/URPSceneDoctor";
 
-        public static string Timestamp => DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        // Include milliseconds to reduce collisions during quick consecutive writes (e.g. BEFORE/AFTER).
+        public static string Timestamp => DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
 
         public static void EnsureFolder(string folder)
         {
@@ -44,6 +45,23 @@ namespace URPSceneDoctor.Editor
             File.Copy(assetPath, backupPath, true);
             AssetDatabase.Refresh();
             return backupPath;
+        }
+
+        public static string EnsureUniqueAssetPath(string candidatePath)
+        {
+            var normalized = candidatePath.Replace('\\', '/');
+            if (!File.Exists(normalized)) return normalized;
+
+            var dir = Path.GetDirectoryName(normalized)?.Replace('\\', '/');
+            var file = Path.GetFileNameWithoutExtension(normalized);
+            var ext = Path.GetExtension(normalized);
+            var idx = 1;
+            while (true)
+            {
+                var next = $"{dir}/{file}_{idx}{ext}";
+                if (!File.Exists(next)) return next;
+                idx++;
+            }
         }
 
         public static void VerboseLog(string message)

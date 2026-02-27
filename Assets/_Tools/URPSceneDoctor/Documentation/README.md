@@ -68,3 +68,10 @@
 6. 进入 Tuning 生成 delta patch。
 7. 进入 Delta Library 添加样本并 `Recompute Stats`。
 8. 回到 Atmos 再扫一遍，确认处方出现 `(Learned)` 文本。
+
+
+## 已知限制 / 性能注意
+- Hub 顶部状态栏已改为缓存快照，并按节流/手动刷新更新，避免 OnGUI 每帧扫描造成卡顿。
+- 透明物体统计按 Renderer 计数（每个 renderer 最多计 1 次），不再按材质槽位累计。
+- 快照与补丁文件名使用毫秒级时间戳，并带路径冲突回避策略，降低 BEFORE/AFTER 连续点击被覆盖风险。
+- 规则系统仍以工程证据为主，不做重图像分析。

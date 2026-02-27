@@ -19,6 +19,10 @@ namespace URPSceneDoctor.Editor
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
 
+        private USD_ScanSnapshot _headerSnapshot;
+        private double _nextHeaderRefreshTime;
+        private const double HeaderRefreshIntervalSec = 1.0;
+
         public string OptionalDeltaPatchPath;
         public string LastReportPath { get; private set; }
         public string LastBeforeSnapshotPath => _tuningModule != null ? _tuningModule.BeforeSnapshotPath : string.Empty;
@@ -54,6 +58,12 @@ namespace URPSceneDoctor.Editor
             _screenshotWidth = settings.screenshotWidth;
             _screenshotHeight = settings.screenshotHeight;
             _learningEnabled = settings.enableLearningHints;
+            RefreshHeaderSnapshot(true);
+        }
+
+        private void OnFocus()
+        {
+            RefreshHeaderSnapshot(true);
         }
 
         private void OnGUI()
@@ -67,13 +77,24 @@ namespace URPSceneDoctor.Editor
 
         private void DrawHeader()
         {
-            var snapshot = USD_AtmosScanner.CaptureSnapshot();
+            if (_headerSnapshot == null || EditorApplication.timeSinceStartup >= _nextHeaderRefreshTime)
+            {
+                RefreshHeaderSnapshot(false);
+            }
+
+            var snapshot = _headerSnapshot ?? new USD_ScanSnapshot();
             EditorGUILayout.HelpBox($"URP Scene Doctor {ToolVersion} | Scene: {ActiveSceneName} | URP: {snapshot.activeURPAssetName} | Renderer: {snapshot.activeRendererDataName} | Global Volume: {snapshot.hasGlobalVolume}", MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Refresh Header", GUILayout.Width(130)))
+            {
+                RefreshHeaderSnapshot(true);
+            }
+
             if (GUILayout.Button("Open Demo Scene", GUILayout.Width(150)))
             {
                 USD_DemoSceneUtil.OpenOrCreateDemoSceneWithPrompt();
+                RefreshHeaderSnapshot(true);
             }
 
             if (GUILayout.Button("Quick Verify", GUILayout.Width(150)))
@@ -81,6 +102,13 @@ namespace URPSceneDoctor.Editor
                 RunQuickVerify();
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void RefreshHeaderSnapshot(bool force)
+        {
+            if (!force && EditorApplication.timeSinceStartup < _nextHeaderRefreshTime && _headerSnapshot != null) return;
+            _headerSnapshot = USD_AtmosScanner.CaptureSnapshot();
+            _nextHeaderRefreshTime = EditorApplication.timeSinceStartup + HeaderRefreshIntervalSec;
         }
 
         private void DrawSidebar()
@@ -173,6 +201,7 @@ namespace URPSceneDoctor.Editor
             }
 
             LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
+            RefreshHeaderSnapshot(true);
         }
 
         public USD_ModuleResult RunAtmosScanForExternal(string timestamp)
@@ -192,6 +221,7 @@ namespace URPSceneDoctor.Editor
             };
             _lastResult = _atmosModule.Execute(ctx);
             LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
+            RefreshHeaderSnapshot(true);
             return _lastResult;
         }
 
@@ -208,7 +238,9 @@ namespace URPSceneDoctor.Editor
                 appliedChanges = new List<string>(result.AppliedChanges),
                 warnings = new List<string>(result.Warnings),
                 tastePolicyName = _activeTastePolicy != null ? _activeTastePolicy.policyName : "(none)",
-                learningSummary = _learningEnabled && _learningStats != null ? $"Learning enabled: {_learningStats.sampleCount} samples; Top hint: {_learningStats.topHints[0]}" : "Learning disabled"
+                learningSummary = _learningEnabled && _learningStats != null && _learningStats.topHints.Count > 0
+                    ? $"Learning enabled: {_learningStats.sampleCount} samples; Top hint: {_learningStats.topHints[0]}"
+                    : "Learning disabled"
             };
 
             if (_activeTastePolicy != null)

@@ -123,13 +123,19 @@ namespace URPSceneDoctor.Editor
                 foreach (var renderer in renderers)
                 {
                     if (renderer == null) continue;
+                    var rendererIsTransparent = false;
                     foreach (var mat in renderer.sharedMaterials)
                     {
                         if (mat == null) continue;
                         materials.Add(mat);
                         if (mat.shader != null) shaders.Add(mat.shader);
-                        if (mat.renderQueue >= (int)RenderQueue.Transparent) transparentCount++;
+                        if (!rendererIsTransparent && mat.renderQueue >= (int)RenderQueue.Transparent)
+                        {
+                            rendererIsTransparent = true;
+                        }
                     }
+
+                    if (rendererIsTransparent) transparentCount++;
                 }
 
                 snapshot.rendererCount = renderers.Length;
