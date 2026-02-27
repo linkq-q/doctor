@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using TA.ToolSuite;
 
 namespace AnimTools
 {
@@ -28,12 +29,14 @@ namespace AnimTools
             EnsureDirectory(outputDir);
 
             var controllerPath = Path.Combine(outputDir, $"{Sanitize(species.speciesKey)}.controller").Replace("\\", "/");
-            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
+            var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
+            if (existing != null)
             {
-                AssetDatabase.DeleteAsset(controllerPath);
+                Undo.DestroyObjectImmediate(existing);
             }
 
             var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+            TTS_EditorUtil.RegisterCreated(controller, "Generate Anim Controller");
             var layer = controller.layers[0];
             var stateMachine = layer.stateMachine;
 
