@@ -7,18 +7,32 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.2";
+        public const string ToolVersion = "v0.3";
 
-        private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Reports", "Settings" };
+        private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Evidence Pack", "Delta Library", "Reports", "Settings" };
         private int _selectedTab;
         private USD_AtmosAuditModule _atmosModule;
         private USD_RenderAuditModule _renderModule;
         private USD_TuningModule _tuningModule;
+        private USD_EvidencePackModule _evidenceModule;
+        private USD_DeltaLibraryModule _deltaLibraryModule;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
 
         public string OptionalDeltaPatchPath;
         public string LastReportPath { get; private set; }
+        public string LastBeforeSnapshotPath => _tuningModule != null ? _tuningModule.BeforeSnapshotPath : string.Empty;
+        public string LastAfterSnapshotPath => _tuningModule != null ? _tuningModule.AfterSnapshotPath : string.Empty;
+        public USD_TastePolicyAsset ActiveTastePolicy => _activeTastePolicy;
+        public int ScreenshotWidth => _screenshotWidth;
+        public int ScreenshotHeight => _screenshotHeight;
+        public USD_DeltaStats CurrentLearningStats => _learningStats;
+
+        private USD_TastePolicyAsset _activeTastePolicy;
+        private USD_DeltaStats _learningStats;
+        private int _screenshotWidth = 1920;
+        private int _screenshotHeight = 1080;
+        private bool _learningEnabled = true;
 
         public string ActiveSceneName => SceneManager.GetActiveScene().name;
 
@@ -33,7 +47,13 @@ namespace URPSceneDoctor.Editor
             _atmosModule = new USD_AtmosAuditModule();
             _renderModule = new USD_RenderAuditModule();
             _tuningModule = new USD_TuningModule();
-            USD_Settings.GetOrCreateSettings();
+            _evidenceModule = new USD_EvidencePackModule();
+            _deltaLibraryModule = new USD_DeltaLibraryModule();
+            var settings = USD_Settings.GetOrCreateSettings();
+            _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
+            _screenshotWidth = settings.screenshotWidth;
+            _screenshotHeight = settings.screenshotHeight;
+            _learningEnabled = settings.enableLearningHints;
         }
 
         private void OnGUI()
@@ -85,9 +105,15 @@ namespace URPSceneDoctor.Editor
                     _tuningModule.DrawUI(this);
                     break;
                 case 3:
-                    DrawReports();
+                    _evidenceModule.DrawUI(this);
                     break;
                 case 4:
+                    _deltaLibraryModule.DrawUI(this);
+                    break;
+                case 5:
+                    DrawReports();
+                    break;
+                case 6:
                     DrawSettings();
                     break;
             }
@@ -98,7 +124,7 @@ namespace URPSceneDoctor.Editor
                 EditorGUILayout.LabelField("Last Work Orders", EditorStyles.boldLabel);
                 foreach (var wo in _lastResult.WorkOrders)
                 {
-                    EditorGUILayout.LabelField($"[{wo.id}] {wo.title} ({wo.severity})");
+                    EditorGUILayout.LabelField($"[{wo.id}] {wo.title} ({wo.severity}) score={wo.sortScore:0.00}");
                 }
             }
 
@@ -135,7 +161,9 @@ namespace URPSceneDoctor.Editor
                 Timestamp = timestamp,
                 SelectedRulePackPath = settings.defaultRulePackPath,
                 OptionalDeltaPatchPath = OptionalDeltaPatchPath,
-                AllowModifyExistingAssets = _assignNewProfileToExistingGlobalVolume
+                AllowModifyExistingAssets = _assignNewProfileToExistingGlobalVolume,
+                TastePolicy = _activeTastePolicy,
+                LearningStats = _learningEnabled ? _learningStats : null
             };
 
             _lastResult = module.Execute(ctx);
@@ -147,7 +175,27 @@ namespace URPSceneDoctor.Editor
             LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
         }
 
-        private string WriteReport(USD_ModuleResult result, string timestamp, string sceneName)
+        public USD_ModuleResult RunAtmosScanForExternal(string timestamp)
+        {
+            var settings = USD_Settings.GetOrCreateSettings();
+            var sceneName = string.IsNullOrWhiteSpace(ActiveSceneName) ? "UntitledScene" : ActiveSceneName;
+            var ctx = new USD_RunContext
+            {
+                Mode = USD_RunMode.Scan,
+                Snapshot = USD_AtmosScanner.CaptureSnapshot(),
+                SceneName = sceneName,
+                Timestamp = timestamp,
+                SelectedRulePackPath = settings.defaultRulePackPath,
+                OptionalDeltaPatchPath = OptionalDeltaPatchPath,
+                TastePolicy = _activeTastePolicy,
+                LearningStats = _learningEnabled ? _learningStats : null
+            };
+            _lastResult = _atmosModule.Execute(ctx);
+            LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
+            return _lastResult;
+        }
+
+        public USD_Report BuildReportFromResult(USD_ModuleResult result, string sceneName, string timestamp)
         {
             var report = new USD_Report
             {
@@ -158,8 +206,16 @@ namespace URPSceneDoctor.Editor
                 snapshot = result.Snapshot,
                 workOrders = new List<USD_WorkOrder>(result.WorkOrders),
                 appliedChanges = new List<string>(result.AppliedChanges),
-                warnings = new List<string>(result.Warnings)
+                warnings = new List<string>(result.Warnings),
+                tastePolicyName = _activeTastePolicy != null ? _activeTastePolicy.policyName : "(none)",
+                learningSummary = _learningEnabled && _learningStats != null ? $"Learning enabled: {_learningStats.sampleCount} samples; Top hint: {_learningStats.topHints[0]}" : "Learning disabled"
             };
+
+            if (_activeTastePolicy != null)
+            {
+                report.tastePriorityOrder = new List<string>(_activeTastePolicy.priorityOrder);
+                report.tasteForbiddenActions = new List<string>(_activeTastePolicy.forbiddenActions);
+            }
 
             if (!string.IsNullOrEmpty(OptionalDeltaPatchPath))
             {
@@ -169,7 +225,17 @@ namespace URPSceneDoctor.Editor
                     report.personalDeltaHints = new List<string>(patch.recommendedRanges);
                 }
             }
+            else if (_learningStats != null)
+            {
+                report.personalDeltaHints = new List<string>(_learningStats.topHints);
+            }
 
+            return report;
+        }
+
+        private string WriteReport(USD_ModuleResult result, string timestamp, string sceneName)
+        {
+            var report = BuildReportFromResult(result, sceneName, timestamp);
             return USD_ReportUtil.WriteReport(sceneName, timestamp, report);
         }
 
@@ -183,7 +249,6 @@ namespace URPSceneDoctor.Editor
 
         private void RunQuickVerify()
         {
-            var sceneName = string.IsNullOrWhiteSpace(ActiveSceneName) ? "UntitledScene" : ActiveSceneName;
             RunModule(_atmosModule, USD_RunMode.Scan, true);
             var hitCount = _lastResult != null ? _lastResult.WorkOrders.Count : 0;
             var warningCount = _lastResult != null ? _lastResult.Warnings.Count : 0;
@@ -193,12 +258,22 @@ namespace URPSceneDoctor.Editor
                 "OK");
         }
 
+        public void SetLearningStats(USD_DeltaStats stats)
+        {
+            _learningStats = stats;
+        }
+
+        public void CreateEvidencePack()
+        {
+            _evidenceModule.CreatePack(this);
+        }
+
         private static void DrawReports()
         {
             EditorGUILayout.HelpBox("Reports are generated under Assets/_Tools/URPSceneDoctor/Reports/{SceneName}", MessageType.Info);
         }
 
-        private static void DrawSettings()
+        private void DrawSettings()
         {
             var settings = USD_Settings.GetOrCreateSettings();
             var so = new SerializedObject(settings);
@@ -209,7 +284,16 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("defaultRulePackPath"));
             EditorGUILayout.PropertyField(so.FindProperty("verboseLogs"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultApplyStrength"));
+            EditorGUILayout.PropertyField(so.FindProperty("screenshotWidth"));
+            EditorGUILayout.PropertyField(so.FindProperty("screenshotHeight"));
+            EditorGUILayout.PropertyField(so.FindProperty("enableLearningHints"));
+            EditorGUILayout.PropertyField(so.FindProperty("defaultTastePolicy"));
             so.ApplyModifiedProperties();
+
+            _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : _activeTastePolicy;
+            _screenshotWidth = settings.screenshotWidth;
+            _screenshotHeight = settings.screenshotHeight;
+            _learningEnabled = settings.enableLearningHints;
         }
     }
 }

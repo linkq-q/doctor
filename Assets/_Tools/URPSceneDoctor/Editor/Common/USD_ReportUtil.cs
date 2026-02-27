@@ -34,6 +34,13 @@ namespace URPSceneDoctor.Editor
             sb.AppendLine($"  - Global Volume: {report.snapshot.hasGlobalVolume}");
             sb.AppendLine($"  - Renderers: {report.snapshot.rendererCount} (Transparent: {report.snapshot.transparentRendererCount})");
             sb.AppendLine($"  - Shadow Distance: {report.snapshot.shadowDistance}");
+            if (!string.IsNullOrEmpty(report.learningSummary)) sb.AppendLine($"  - Learning: {report.learningSummary}");
+
+            sb.AppendLine($"- Taste Policy Applied: {report.tastePolicyName}");
+            if (report.tastePriorityOrder != null && report.tastePriorityOrder.Count > 0)
+                sb.AppendLine("  - Priority Order: " + string.Join(" > ", report.tastePriorityOrder));
+            if (report.tasteForbiddenActions != null && report.tasteForbiddenActions.Count > 0)
+                sb.AppendLine("  - Forbidden: " + string.Join(", ", report.tasteForbiddenActions));
 
             sb.AppendLine("- Work Orders");
             WriteSeverityGroup(sb, report.workOrders, "P0");

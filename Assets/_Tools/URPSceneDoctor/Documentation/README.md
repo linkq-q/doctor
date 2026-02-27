@@ -1,56 +1,70 @@
-# URP Scene Doctor v0.2（unitypackage 用户手册）
+# URP Scene Doctor v0.3（unitypackage 用户手册）
 
-## 1) 导入 unitypackage
-1. 在 Unity 中打开目标 URP 项目（建议 Unity 2022.3 + URP 14）。
+## 导入 unitypackage
+1. 打开 Unity URP 项目（推荐 Unity 2022.3 + URP 14）。
 2. 菜单 `Assets > Import Package > Custom Package...`。
-3. 选择导出的 `URPSceneDoctor_v0.2.unitypackage` 并全部导入。
+3. 选择 `URPSceneDoctor_v0.3.unitypackage` 导入。
 
-## 2) 打开工具
+## 打开工具
 - 菜单：`Tools/URP Scene Doctor`。
-- Hub 顶部会显示版本号 `v0.2`、当前场景、URP 资产、Renderer、Global Volume 状态。
+- 顶部显示版本、场景状态与 URP/Volume 概况。
 
-## 3) Demo 场景如何打开
-- 在 Hub 顶部点击 `Open Demo Scene`。
-- 若当前场景有未保存改动，会弹出保存确认。
-- 工具会打开（或自动创建）`Assets/_Tools/URPSceneDoctor/Samples/Scenes/USD_DemoScene.unity`。
+## Evidence Pack（可分享证据包）
+### 如何生成
+- 在 `Atmosphere Doctor` 点击 `Create Evidence Pack`，或进入 `Evidence Pack` 模块点击同名按钮。
 
-## 4) Quick Verify 怎么用
-- 在 Hub 顶部点击 `Quick Verify`。
-- 工具会顺序执行：`Atmos Scan -> Export Report`（不会自动 Apply）。
-- 完成后弹窗显示：报告路径、命中规则数量、warnings 数量。
+### 生成内容
+输出目录：
+`Assets/_Tools/URPSceneDoctor/EvidencePacks/{SceneName}/{timestamp}/`
+- `before/shot_01..06.png`
+- `after/shot_01..06.png`
+- `summary.md`
+- `diff.json`
+- `report.md` / `report.json`
+- `snapshot_before.json` / `snapshot_after.json`
+- `deltaPatch.json`（若当次可用）
 
-## 5) Scan / Dry Run / Apply
-在 Atmosphere Doctor 或 Render Doctor 页面：
-- `Scan`：只读扫描，输出 snapshot + 报告。
-- `Dry Run`：生成工单，不执行资产修改。
-- `Apply`：执行允许动作。
+### 如何分享
+- 直接把整包文件夹打包给 TA/美术/程序即可复现“证据 + 建议 + 差异”。
 
-### Apply 资产行为（安全默认）
-- 仅创建新资产，不覆盖现有资产：
-  - 若无 Global Volume，会创建 `USD_GlobalVolume`。
-  - 始终创建新的 Volume Profile 到 `Assets/_Tools/URPSceneDoctor/Patches/{SceneName}`。
-- 复选框：`Assign new profile to existing Global Volume (default OFF)`
-  - OFF：已有 Global Volume 时只生成 profile，不替换绑定。
-  - ON：允许替换绑定（已记录 Undo）。
+## Taste Policy（偏好策略）
+- 作用：不存固定参数值，只控制排序、禁忌与处方措辞。
+- 在 `Settings` 选择 `DefaultTastePolicy`。
+- 会影响：
+  1. 工单排序（severityWeight * categoryWeight + 轻学习加成）
+  2. recommendedRange 末尾追加 `(TastePolicy) prefer/avoid`
+  3. 报告中显示 policy 名、priorityOrder、forbiddenActions
 
-## 6) Undo 与可回滚
-- 所有创建/修改均通过 Undo 记录，可使用 `Edit > Undo` 回滚。
+## Delta Library（多样本学习）
+### 添加样本
+- `Add Last Tuning Result`：把最近 Tuning 结果登记到样本库。
+- `Import Folder...`：导入已有样本目录（含 `deltaPatch.json`）。
 
-## 7) 输出路径
-- Reports：`Assets/_Tools/URPSceneDoctor/Reports/{SceneName}/`
-- Snapshots：`Assets/_Tools/URPSceneDoctor/Snapshots/{SceneName}/`
-- Patches：`Assets/_Tools/URPSceneDoctor/Patches/{SceneName}/`
+### 统计
+- 点击 `Recompute Stats` 生成：
+  - `Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats/delta_stats.json`
+  - `Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats/delta_stats.md`
+- 输出内容：样本数、Top changed fields、Top5 hints、数值字段区间。
 
-## 8) Tuning（你的审美沉淀）
-1. `Capture BEFORE`
-2. 手动调整场景
-3. `Capture AFTER`
-4. `Extract Delta Patch`
+### 如何让建议“像你”
+- 启用 learning 后，Atmos 工单处方会追加 `(Learned) ...`。
+- 报告 Summary 会显示学习状态与 top hint。
 
-UI 会展示：
-- Before/After 路径
-- DeltaPatch 路径
-- changed fields 统计
-- `Open Snapshot Folder` / `Open Patch Folder` 快捷按钮
+## 推荐工作流（你的计划）
+1. 下载场景 → `Scan/DryRun`
+2. `Apply`（安全生成 Profile）
+3. 手调到满意
+4. Tuning：`BEFORE/AFTER`
+5. `Extract Delta Patch`
+6. Delta Library：`Add Last Tuning Result` → `Recompute Stats`
+7. 下一次项目建议自动包含 learned hints
 
-Atmos 工单会在处方范围末尾追加 `(Personal delta hint) ...` 文本。
+## 自测步骤（从导入到 Evidence Pack）
+1. 导入 unitypackage。
+2. 打开 `Tools/URP Scene Doctor`。
+3. 点击 `Open Demo Scene`。
+4. Atmos 页点击 `Scan`，确认产出 report。
+5. 点击 `Create Evidence Pack`，检查 evidence pack 文件夹完整。
+6. 进入 Tuning 生成 delta patch。
+7. 进入 Delta Library 添加样本并 `Recompute Stats`。
+8. 回到 Atmos 再扫一遍，确认处方出现 `(Learned)` 文本。

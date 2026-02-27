@@ -18,6 +18,8 @@ namespace URPSceneDoctor.Editor
         public string SelectedRulePackPath;
         public string OptionalDeltaPatchPath;
         public bool AllowModifyExistingAssets;
+        public USD_TastePolicyAsset TastePolicy;
+        public USD_DeltaStats LearningStats;
     }
 
     public sealed class USD_ModuleResult

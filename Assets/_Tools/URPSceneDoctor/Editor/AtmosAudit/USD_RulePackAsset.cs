@@ -37,6 +37,7 @@ namespace URPSceneDoctor.Editor
         public string title;
         public string severity;
         public string category;
+        public string subCategory;
         public List<USD_Trigger> triggers = new List<USD_Trigger>();
         public List<USD_Trigger> excludes = new List<USD_Trigger>();
         public List<string> symptoms = new List<string>();

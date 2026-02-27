@@ -51,7 +51,6 @@ namespace URPSceneDoctor.Editor
         public bool hasManyDifferentShaders;
 
         public List<string> warnings = new List<string>();
-        public List<string> personalDeltaHints = new List<string>();
     }
 
     [Serializable]
@@ -87,6 +86,8 @@ namespace URPSceneDoctor.Editor
         public string title;
         public string severity;
         public string category;
+        public string subCategory;
+        public float sortScore;
         public List<string> symptoms = new List<string>();
         public List<string> evidence = new List<string>();
         public string diagnosis;
@@ -103,6 +104,10 @@ namespace URPSceneDoctor.Editor
         public string module;
         public string sceneName;
         public string timestamp;
+        public string tastePolicyName;
+        public List<string> tastePriorityOrder = new List<string>();
+        public List<string> tasteForbiddenActions = new List<string>();
+        public string learningSummary;
         public USD_ScanSnapshot snapshot;
         public List<USD_WorkOrder> workOrders = new List<USD_WorkOrder>();
         public List<string> appliedChanges = new List<string>();
@@ -128,5 +133,49 @@ namespace URPSceneDoctor.Editor
         public List<USD_DeltaField> changedFields = new List<USD_DeltaField>();
         public List<string> frequentPatterns = new List<string>();
         public List<string> recommendedRanges = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class USD_FieldChange
+    {
+        public string path;
+        public string before;
+        public string after;
+    }
+
+    [Serializable]
+    public sealed class USD_DiffReport
+    {
+        public string sceneName;
+        public string timestamp;
+        public List<USD_FieldChange> pipelineChanges = new List<USD_FieldChange>();
+        public List<USD_FieldChange> volumeChanges = new List<USD_FieldChange>();
+        public List<USD_FieldChange> sceneChanges = new List<USD_FieldChange>();
+        public List<string> workOrderIds = new List<string>();
+        public int tuningChangedFieldCount;
+        public List<string> tuningTopChanges = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class USD_LearningFieldStat
+    {
+        public string path;
+        public int count;
+        public float mean;
+        public float median;
+        public float min;
+        public float max;
+        public float positiveRate;
+        public string recommendedRangeHint;
+    }
+
+    [Serializable]
+    public sealed class USD_DeltaStats
+    {
+        public int sampleCount;
+        public string lastUpdated;
+        public List<string> sampleRefs = new List<string>();
+        public List<USD_LearningFieldStat> topChangedFields = new List<USD_LearningFieldStat>();
+        public List<string> topHints = new List<string>();
     }
 }

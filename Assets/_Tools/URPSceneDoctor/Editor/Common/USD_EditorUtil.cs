@@ -78,15 +78,29 @@ namespace URPSceneDoctor.Editor
         public string defaultRulePackPath = "Assets/_Tools/URPSceneDoctor/Config/RulePacks/DefaultRulePack.json";
         public bool verboseLogs;
         public float defaultApplyStrength = 1f;
+        public int screenshotWidth = 1920;
+        public int screenshotHeight = 1080;
+        public bool enableLearningHints = true;
+        public USD_TastePolicyAsset defaultTastePolicy;
 
         public static USD_Settings GetOrCreateSettings()
         {
             const string settingsPath = "Assets/_Tools/URPSceneDoctor/Config/USD_Settings.asset";
             var settings = AssetDatabase.LoadAssetAtPath<USD_Settings>(settingsPath);
-            if (settings != null) return settings;
+            if (settings != null)
+            {
+                if (settings.defaultTastePolicy == null)
+                {
+                    settings.defaultTastePolicy = USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
+                    EditorUtility.SetDirty(settings);
+                    AssetDatabase.SaveAssets();
+                }
+                return settings;
+            }
 
             USD_EditorUtil.EnsureFolder("Assets/_Tools/URPSceneDoctor/Config");
             settings = CreateInstance<USD_Settings>();
+            settings.defaultTastePolicy = USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
             AssetDatabase.CreateAsset(settings, settingsPath);
             AssetDatabase.SaveAssets();
             return settings;

@@ -1,6 +1,6 @@
 {
   "name": "Default Atmos RulePack",
-  "version": "0.1",
+  "version": "0.3",
   "description": "Atmosphere-first heuristic rule pack for URP Scene Doctor.",
   "rules": [
     {
@@ -34,7 +34,8 @@
         "在同机位对比前后主体轮廓",
         "确认阴影不过黑且方向统一"
       ],
-      "applyActionsTemplate": []
+      "applyActionsTemplate": [],
+      "subCategory": "Readability"
     },
     {
       "id": "R-P0-02",
@@ -77,7 +78,8 @@
           "payloadJson": "{\"target\":\"GlobalVolume\"}",
           "requiresUserOptIn": false
         }
-      ]
+      ],
+      "subCategory": "ColorMood"
     },
     {
       "id": "R-P0-03",
@@ -119,7 +121,8 @@
       ],
       "verificationTemplate": [
         "中景物体边缘可读性提升"
-      ]
+      ],
+      "subCategory": "Depth"
     },
     {
       "id": "R-P0-04",
@@ -156,7 +159,8 @@
       ],
       "verificationTemplate": [
         "金属与高光材质反应更稳定"
-      ]
+      ],
+      "subCategory": "Depth"
     },
     {
       "id": "R-P1-01",
@@ -192,7 +196,8 @@
       ],
       "verificationTemplate": [
         "远景不过度抢眼，主体更突出"
-      ]
+      ],
+      "subCategory": "Depth"
     },
     {
       "id": "R-P1-02",
@@ -223,7 +228,8 @@
       ],
       "verificationTemplate": [
         "白灰区域不偏色"
-      ]
+      ],
+      "subCategory": "ColorMood"
     },
     {
       "id": "R-P1-03",
@@ -259,7 +265,8 @@
       ],
       "verificationTemplate": [
         "同类材质观感一致"
-      ]
+      ],
+      "subCategory": "ColorMood"
     },
     {
       "id": "R-P1-04",
@@ -295,7 +302,8 @@
       ],
       "verificationTemplate": [
         "高亮不过曝，边缘不过暗"
-      ]
+      ],
+      "subCategory": "Polish"
     },
     {
       "id": "R-P1-05",
@@ -326,7 +334,8 @@
       ],
       "verificationTemplate": [
         "整体材质语言统一"
-      ]
+      ],
+      "subCategory": "Readability"
     },
     {
       "id": "R-P1-06",
@@ -362,7 +371,8 @@
       ],
       "verificationTemplate": [
         "主体三机位可读"
-      ]
+      ],
+      "subCategory": "Readability"
     },
     {
       "id": "R-P2-01",
@@ -393,7 +403,8 @@
       ],
       "verificationTemplate": [
         "纹理细节不出现边缘光晕"
-      ]
+      ],
+      "subCategory": "Polish"
     },
     {
       "id": "R-P2-02",
@@ -424,7 +435,8 @@
       ],
       "verificationTemplate": [
         "多区域切换时色彩一致"
-      ]
+      ],
+      "subCategory": "ColorMood"
     }
   ]
 }

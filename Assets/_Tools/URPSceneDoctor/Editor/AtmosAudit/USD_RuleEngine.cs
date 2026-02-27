@@ -2,19 +2,36 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace URPSceneDoctor.Editor
 {
     public static class USD_RuleEngine
     {
+        private static readonly Dictionary<string, string> RuleFieldMap = new Dictionary<string, string>
+        {
+            { "R-P0-01", "Lighting.dirLightShadowsEnabled" },
+            { "R-P0-02", "Volumes.hasGlobalVolume" },
+            { "R-P0-03", "Lighting.ambientIntensity" },
+            { "R-P0-04", "Lighting.hasAnyReflectionProbe" },
+            { "R-P1-01", "Scene.materialCountDistinct" },
+            { "R-P1-02", "Volumes.enabledOverrides" },
+            { "R-P1-03", "Scene.shaderCountDistinct" },
+            { "R-P1-04", "Volumes.enabledOverridesCount" },
+            { "R-P1-05", "Scene.shaderCountDistinct" },
+            { "R-P1-06", "Scene.transparentRendererCount" },
+            { "R-P2-01", "Volumes.enabledOverrides" },
+            { "R-P2-02", "Volumes.enabledOverrides" }
+        };
+
         public static USD_RulePack LoadRulePack(string path)
         {
             if (!File.Exists(path)) return new USD_RulePack();
             return JsonUtility.FromJson<USD_RulePack>(File.ReadAllText(path));
         }
 
-        public static List<USD_WorkOrder> Evaluate(USD_ScanSnapshot snapshot, USD_RulePack pack, USD_DeltaPatch deltaPatch = null)
+        public static List<USD_WorkOrder> Evaluate(USD_ScanSnapshot snapshot, USD_RulePack pack, USD_DeltaPatch deltaPatch = null, USD_TastePolicyAsset tastePolicy = null, USD_DeltaStats learningStats = null)
         {
             var orders = new List<USD_WorkOrder>();
             foreach (var rule in pack.rules)
@@ -28,11 +45,18 @@ namespace URPSceneDoctor.Editor
                     title = rule.title,
                     severity = rule.severity,
                     category = rule.category,
+                    subCategory = string.IsNullOrEmpty(rule.subCategory) ? "Readability" : rule.subCategory,
                     diagnosis = rule.diagnosisTemplate,
                     costNotes = string.IsNullOrEmpty(rule.notes) ? "Low to medium implementation cost." : rule.notes
                 };
-                wo.symptoms.AddRange(rule.symptoms);
                 wo.evidence.AddRange(BuildEvidence(snapshot, rule));
+                wo.symptoms.AddRange(rule.symptoms);
+
+                var learnedHint = string.Empty;
+                if (learningStats != null && RuleFieldMap.TryGetValue(rule.id, out var fieldPath))
+                {
+                    learnedHint = USD_DeltaStatsUtil.GetLearnedHint(learningStats, fieldPath);
+                }
 
                 foreach (var p in rule.prescriptions)
                 {
@@ -40,6 +64,16 @@ namespace URPSceneDoctor.Editor
                     if (deltaPatch != null && deltaPatch.recommendedRanges.Count > 0)
                     {
                         range += " (Personal delta hint) " + string.Join("; ", deltaPatch.recommendedRanges);
+                    }
+
+                    if (!string.IsNullOrEmpty(learnedHint))
+                    {
+                        range += " (Learned) " + learnedHint;
+                    }
+
+                    if (tastePolicy != null)
+                    {
+                        range += $" (TastePolicy) prefer: {string.Join(" > ", tastePolicy.priorityOrder)}; avoid: {string.Join(", ", tastePolicy.forbiddenActions)}";
                     }
 
                     wo.prescriptions.Add(new USD_Prescription
@@ -69,8 +103,19 @@ namespace URPSceneDoctor.Editor
                     });
                 }
 
+                var severityWeight = USD_TastePolicyUtil.SeverityWeight(tastePolicy, wo.severity);
+                var categoryWeight = USD_TastePolicyUtil.CategoryWeight(tastePolicy, wo.subCategory);
+                var learnedBoost = string.IsNullOrEmpty(learnedHint) ? 0f : 0.1f;
+                wo.sortScore = severityWeight * categoryWeight + learnedBoost;
+
                 orders.Add(wo);
             }
+
+            orders = orders
+                .OrderByDescending(x => x.sortScore)
+                .ThenBy(x => USD_TastePolicyUtil.PriorityOrderIndex(tastePolicy, x.subCategory))
+                .ThenBy(x => x.id)
+                .ToList();
 
             return orders;
         }

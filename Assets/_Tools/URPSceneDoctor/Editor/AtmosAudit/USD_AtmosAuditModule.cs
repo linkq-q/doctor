@@ -10,6 +10,11 @@ namespace URPSceneDoctor.Editor
         public void DrawUI(USD_HubWindow hub)
         {
             EditorGUILayout.LabelField("Atmosphere-first audit based on project evidence.", EditorStyles.wordWrappedLabel);
+            EditorGUILayout.LabelField("Taste Policy:", hub.ActiveTastePolicy != null ? hub.ActiveTastePolicy.policyName : "(none)");
+            if (GUILayout.Button("Create Evidence Pack"))
+            {
+                hub.CreateEvidencePack();
+            }
             hub.DrawExecutionButtons(this);
         }
 
@@ -23,7 +28,7 @@ namespace URPSceneDoctor.Editor
             var deltaPatch = string.IsNullOrEmpty(context.OptionalDeltaPatchPath)
                 ? null
                 : USD_SnapshotUtil.LoadDeltaPatch(context.OptionalDeltaPatchPath);
-            result.WorkOrders.AddRange(USD_RuleEngine.Evaluate(snapshot, rulePack, deltaPatch));
+            result.WorkOrders.AddRange(USD_RuleEngine.Evaluate(snapshot, rulePack, deltaPatch, context.TastePolicy, context.LearningStats));
             result.Warnings.AddRange(snapshot.warnings);
 
             if (context.Mode == USD_RunMode.Apply)
