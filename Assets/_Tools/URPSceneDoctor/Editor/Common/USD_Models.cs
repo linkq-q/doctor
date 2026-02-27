@@ -104,6 +104,9 @@ namespace URPSceneDoctor.Editor
         public string module;
         public string sceneName;
         public string timestamp;
+        public string applyMode;
+        public string styleProfileName;
+        public string bindPolicy;
         public string tastePolicyName;
         public List<string> tastePriorityOrder = new List<string>();
         public List<string> tasteForbiddenActions = new List<string>();

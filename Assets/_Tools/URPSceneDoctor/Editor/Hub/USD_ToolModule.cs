@@ -9,6 +9,12 @@ namespace URPSceneDoctor.Editor
         Apply
     }
 
+    public enum USD_ApplyMode
+    {
+        SafeNeutral,
+        VisibleDemo
+    }
+
     public sealed class USD_RunContext
     {
         public USD_RunMode Mode;
@@ -20,6 +26,8 @@ namespace URPSceneDoctor.Editor
         public bool AllowModifyExistingAssets;
         public USD_TastePolicyAsset TastePolicy;
         public USD_DeltaStats LearningStats;
+        public USD_ApplyMode ApplyMode;
+        public USD_StyleProfileAsset StyleProfile;
     }
 
     public sealed class USD_ModuleResult

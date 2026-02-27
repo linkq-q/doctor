@@ -33,7 +33,7 @@ namespace URPSceneDoctor.Editor
 
             if (context.Mode == USD_RunMode.Apply)
             {
-                result.AppliedChanges.AddRange(USD_PatchApplier.ApplySafeAtmospherePatch(context.SceneName, context.Timestamp, context.AllowModifyExistingAssets));
+                result.AppliedChanges.AddRange(USD_PatchApplier.ApplyPatch(context.SceneName, context.Timestamp, context.ApplyMode, context.StyleProfile, context.AllowModifyExistingAssets));
             }
 
             return result;

@@ -5,15 +5,24 @@ using UnityEngine;
 
 namespace URPSceneDoctor.Editor
 {
+    public sealed class USD_ShotCapture
+    {
+        public string path;
+        public Vector3 position;
+        public float yaw;
+        public float pitch;
+        public float fov;
+    }
+
     public static class USD_ScreenshotUtil
     {
-        public static List<string> CaptureSixShots(string outputFolder, int width, int height, Camera sourceCamera = null)
+        public static List<USD_ShotCapture> CaptureSixShots(string outputFolder, int width, int height, Camera sourceCamera = null)
         {
             USD_EditorUtil.EnsureFolder(outputFolder);
             var camera = sourceCamera != null ? sourceCamera : SceneView.lastActiveSceneView != null ? SceneView.lastActiveSceneView.camera : null;
-            if (camera == null) return new List<string>();
+            if (camera == null) return new List<USD_ShotCapture>();
 
-            var paths = new List<string>();
+            var captures = new List<USD_ShotCapture>();
             var variants = new[]
             {
                 new Vector3(0f,0f,0f),
@@ -41,12 +50,20 @@ namespace URPSceneDoctor.Editor
 
                 var path = $"{outputFolder}/shot_{i + 1:00}.png";
                 CaptureCamera(tempCam, width, height, path);
-                paths.Add(path);
+                var euler = tempGo.transform.eulerAngles;
+                captures.Add(new USD_ShotCapture
+                {
+                    path = path,
+                    position = tempGo.transform.position,
+                    yaw = euler.y,
+                    pitch = euler.x,
+                    fov = tempCam.fieldOfView
+                });
             }
 
             Object.DestroyImmediate(tempGo);
             AssetDatabase.Refresh();
-            return paths;
+            return captures;
         }
 
         private static void CaptureCamera(Camera cam, int width, int height, string outputPath)

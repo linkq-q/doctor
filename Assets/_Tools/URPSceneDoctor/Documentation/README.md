@@ -1,17 +1,37 @@
-# URP Scene Doctor v0.3（unitypackage 用户手册）
+# URP Scene Doctor v0.4（unitypackage 用户手册）
 
 ## 导入 unitypackage
 1. 打开 Unity URP 项目（推荐 Unity 2022.3 + URP 14）。
 2. 菜单 `Assets > Import Package > Custom Package...`。
-3. 选择 `URPSceneDoctor_v0.3.unitypackage` 导入。
+3. 选择 `URPSceneDoctor_v0.4.unitypackage` 导入。
 
 ## 打开工具
 - 菜单：`Tools/URP Scene Doctor`。
 - 顶部显示版本、场景状态与 URP/Volume 概况。
 
+## Apply Mode（Safe vs VisibleDemo）
+Atmosphere Doctor 面板新增 **Apply Options**：
+- **Apply Mode**
+  - `SafeNeutral`（默认）：生成新 Global Volume + 新 Profile（中性参数），视觉变化极小。
+  - `VisibleDemo`：仍创建新 Profile，但会按风格注入可见变化，便于演示/测试证据包。
+- **Style Profile**
+  - Neutral Baseline
+  - Clean Stylized
+  - Warm Dusk
+  - Moody Cool
+- **Bind Policy**
+  - `Assign new profile to existing Global Volume` 默认 OFF。
+  - 默认不会覆盖现有 Global Volume 绑定；仅用户主动开启才绑定。
+
+## Style Profiles（风格倾向）
+- 风格参数由 `visibleIntensity` + 参数范围插值生成，不是写死单点值。
+- 仅作用于 Scene Doctor 新建/复制出来的 profile，不直接改用户原 profile。
+- 推荐用途：Demo 场景和评审演示，真实项目默认使用 SafeNeutral。
+
 ## Evidence Pack（可分享证据包）
 ### 如何生成
 - 在 `Atmosphere Doctor` 点击 `Create Evidence Pack`，或进入 `Evidence Pack` 模块点击同名按钮。
+- 证据包会按当前 Apply Mode + Style Profile 进行 Before/After。
 
 ### 生成内容
 输出目录：
@@ -24,54 +44,32 @@
 - `snapshot_before.json` / `snapshot_after.json`
 - `deltaPatch.json`（若当次可用）
 
-### 如何分享
-- 直接把整包文件夹打包给 TA/美术/程序即可复现“证据 + 建议 + 差异”。
+### summary.md 会包含
+- Apply Mode / Style Profile / Bind Policy
+- Key visual knobs（如 WB temperature、contrast、saturation）
+- Key diff summary（Top 5）
+- 每张 shot 的相机参数（pos / yaw / pitch / fov）用于复现
 
 ## Taste Policy（偏好策略）
 - 作用：不存固定参数值，只控制排序、禁忌与处方措辞。
 - 在 `Settings` 选择 `DefaultTastePolicy`。
-- 会影响：
-  1. 工单排序（severityWeight * categoryWeight + 轻学习加成）
-  2. recommendedRange 末尾追加 `(TastePolicy) prefer/avoid`
-  3. 报告中显示 policy 名、priorityOrder、forbiddenActions
 
 ## Delta Library（多样本学习）
-### 添加样本
-- `Add Last Tuning Result`：把最近 Tuning 结果登记到样本库。
-- `Import Folder...`：导入已有样本目录（含 `deltaPatch.json`）。
-
-### 统计
-- 点击 `Recompute Stats` 生成：
+- `Add Last Tuning Result` 或 `Import Folder...` 导入样本。
+- `Recompute Stats` 生成：
   - `Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats/delta_stats.json`
   - `Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats/delta_stats.md`
-- 输出内容：样本数、Top changed fields、Top5 hints、数值字段区间。
+- 启用 learning 后，Atmos 工单会追加 `(Learned)` 文本。
 
-### 如何让建议“像你”
-- 启用 learning 后，Atmos 工单处方会追加 `(Learned) ...`。
-- 报告 Summary 会显示学习状态与 top hint。
-
-## 推荐工作流（你的计划）
-1. 下载场景 → `Scan/DryRun`
-2. `Apply`（安全生成 Profile）
-3. 手调到满意
-4. Tuning：`BEFORE/AFTER`
-5. `Extract Delta Patch`
-6. Delta Library：`Add Last Tuning Result` → `Recompute Stats`
-7. 下一次项目建议自动包含 learned hints
-
-## 自测步骤（从导入到 Evidence Pack）
-1. 导入 unitypackage。
-2. 打开 `Tools/URP Scene Doctor`。
-3. 点击 `Open Demo Scene`。
-4. Atmos 页点击 `Scan`，确认产出 report。
-5. 点击 `Create Evidence Pack`，检查 evidence pack 文件夹完整。
-6. 进入 Tuning 生成 delta patch。
-7. 进入 Delta Library 添加样本并 `Recompute Stats`。
-8. 回到 Atmos 再扫一遍，确认处方出现 `(Learned)` 文本。
-
+## 推荐工作流（v0.4）
+1. 打开 Demo Scene。
+2. Atmos `Scan`。
+3. `Apply`: 选择 `VisibleDemo + Warm Dusk`（或其它风格）。
+4. 点击 `Create Evidence Pack`，检查 before/after 与 summary。
+5. 真实项目切回 `SafeNeutral`，以建议与安全 apply 为主。
 
 ## 已知限制 / 性能注意
-- Hub 顶部状态栏已改为缓存快照，并按节流/手动刷新更新，避免 OnGUI 每帧扫描造成卡顿。
-- 透明物体统计按 Renderer 计数（每个 renderer 最多计 1 次），不再按材质槽位累计。
-- 快照与补丁文件名使用毫秒级时间戳，并带路径冲突回避策略，降低 BEFORE/AFTER 连续点击被覆盖风险。
-- 规则系统仍以工程证据为主，不做重图像分析。
+- Hub 顶部状态栏使用缓存快照 + 节流刷新，避免 OnGUI 每帧全量扫描。
+- 透明物体统计按 Renderer 计数（每个 renderer 最多计 1 次）。
+- 快照与补丁文件名包含毫秒级时间戳，并有路径冲突回避策略。
+- 内置 Style Profile 资产会在首次打开 Hub 时自动创建到 `Config/StyleProfiles`。

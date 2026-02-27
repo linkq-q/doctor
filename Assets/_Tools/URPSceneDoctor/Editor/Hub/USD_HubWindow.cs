@@ -7,7 +7,7 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.3";
+        public const string ToolVersion = "v0.4";
 
         private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Evidence Pack", "Delta Library", "Reports", "Settings" };
         private int _selectedTab;
@@ -18,6 +18,9 @@ namespace URPSceneDoctor.Editor
         private USD_DeltaLibraryModule _deltaLibraryModule;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
+        private USD_ApplyMode _applyMode = USD_ApplyMode.SafeNeutral;
+        private USD_StyleProfileAsset[] _styleProfiles = new USD_StyleProfileAsset[0];
+        private int _selectedStyleIndex;
 
         private USD_ScanSnapshot _headerSnapshot;
         private double _nextHeaderRefreshTime;
@@ -31,6 +34,9 @@ namespace URPSceneDoctor.Editor
         public int ScreenshotWidth => _screenshotWidth;
         public int ScreenshotHeight => _screenshotHeight;
         public USD_DeltaStats CurrentLearningStats => _learningStats;
+        public USD_ApplyMode ApplyMode => _applyMode;
+        public USD_StyleProfileAsset SelectedStyleProfile => (_styleProfiles != null && _styleProfiles.Length > 0 && _selectedStyleIndex >= 0 && _selectedStyleIndex < _styleProfiles.Length) ? _styleProfiles[_selectedStyleIndex] : null;
+        public bool AssignNewProfileToExistingGlobalVolume => _assignNewProfileToExistingGlobalVolume;
 
         private USD_TastePolicyAsset _activeTastePolicy;
         private USD_DeltaStats _learningStats;
@@ -58,6 +64,8 @@ namespace URPSceneDoctor.Editor
             _screenshotWidth = settings.screenshotWidth;
             _screenshotHeight = settings.screenshotHeight;
             _learningEnabled = settings.enableLearningHints;
+            _styleProfiles = USD_StyleProfileUtil.GetOrCreateBuiltIns();
+            _selectedStyleIndex = 0;
             RefreshHeaderSnapshot(true);
         }
 
@@ -170,18 +178,46 @@ namespace URPSceneDoctor.Editor
 
             if (module.ModuleName == "Atmosphere Doctor")
             {
-                _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft(
-                    "Assign new profile to existing Global Volume (default OFF)",
-                    _assignNewProfileToExistingGlobalVolume);
+                DrawApplyOptions();
             }
+        }
+
+        private void DrawApplyOptions()
+        {
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField("Apply Options", EditorStyles.boldLabel);
+            _applyMode = (USD_ApplyMode)EditorGUILayout.EnumPopup("Apply Mode", _applyMode);
+
+            var names = new string[_styleProfiles.Length];
+            for (var i = 0; i < _styleProfiles.Length; i++)
+            {
+                names[i] = _styleProfiles[i] != null ? _styleProfiles[i].profileName : "(missing)";
+            }
+
+            _selectedStyleIndex = _styleProfiles.Length == 0 ? 0 : Mathf.Clamp(EditorGUILayout.Popup("Style Profile", _selectedStyleIndex, names), 0, _styleProfiles.Length - 1);
+            _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft(
+                "Assign new profile to existing Global Volume (default OFF)",
+                _assignNewProfileToExistingGlobalVolume);
         }
 
         private void RunModule(IToolModule module, USD_RunMode mode, bool saveSnapshot)
         {
-            var timestamp = USD_EditorUtil.Timestamp;
+            var ctx = BuildRunContext(mode, USD_EditorUtil.Timestamp);
+            _lastResult = module.Execute(ctx);
+            if (saveSnapshot)
+            {
+                USD_SnapshotUtil.SaveSnapshot(ctx.SceneName, ctx.Timestamp, _lastResult.Snapshot);
+            }
+
+            LastReportPath = WriteReport(_lastResult, ctx.Timestamp, ctx.SceneName);
+            RefreshHeaderSnapshot(true);
+        }
+
+        private USD_RunContext BuildRunContext(USD_RunMode mode, string timestamp)
+        {
             var settings = USD_Settings.GetOrCreateSettings();
             var sceneName = string.IsNullOrWhiteSpace(ActiveSceneName) ? "UntitledScene" : ActiveSceneName;
-            var ctx = new USD_RunContext
+            return new USD_RunContext
             {
                 Mode = mode,
                 Snapshot = USD_AtmosScanner.CaptureSnapshot(),
@@ -191,36 +227,17 @@ namespace URPSceneDoctor.Editor
                 OptionalDeltaPatchPath = OptionalDeltaPatchPath,
                 AllowModifyExistingAssets = _assignNewProfileToExistingGlobalVolume,
                 TastePolicy = _activeTastePolicy,
-                LearningStats = _learningEnabled ? _learningStats : null
+                LearningStats = _learningEnabled ? _learningStats : null,
+                ApplyMode = _applyMode,
+                StyleProfile = SelectedStyleProfile
             };
-
-            _lastResult = module.Execute(ctx);
-            if (saveSnapshot)
-            {
-                USD_SnapshotUtil.SaveSnapshot(sceneName, timestamp, _lastResult.Snapshot);
-            }
-
-            LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
-            RefreshHeaderSnapshot(true);
         }
 
-        public USD_ModuleResult RunAtmosScanForExternal(string timestamp)
+        public USD_ModuleResult RunAtmosForExternal(string timestamp, USD_RunMode mode)
         {
-            var settings = USD_Settings.GetOrCreateSettings();
-            var sceneName = string.IsNullOrWhiteSpace(ActiveSceneName) ? "UntitledScene" : ActiveSceneName;
-            var ctx = new USD_RunContext
-            {
-                Mode = USD_RunMode.Scan,
-                Snapshot = USD_AtmosScanner.CaptureSnapshot(),
-                SceneName = sceneName,
-                Timestamp = timestamp,
-                SelectedRulePackPath = settings.defaultRulePackPath,
-                OptionalDeltaPatchPath = OptionalDeltaPatchPath,
-                TastePolicy = _activeTastePolicy,
-                LearningStats = _learningEnabled ? _learningStats : null
-            };
+            var ctx = BuildRunContext(mode, timestamp);
             _lastResult = _atmosModule.Execute(ctx);
-            LastReportPath = WriteReport(_lastResult, timestamp, sceneName);
+            LastReportPath = WriteReport(_lastResult, timestamp, ctx.SceneName);
             RefreshHeaderSnapshot(true);
             return _lastResult;
         }
@@ -240,7 +257,10 @@ namespace URPSceneDoctor.Editor
                 tastePolicyName = _activeTastePolicy != null ? _activeTastePolicy.policyName : "(none)",
                 learningSummary = _learningEnabled && _learningStats != null && _learningStats.topHints.Count > 0
                     ? $"Learning enabled: {_learningStats.sampleCount} samples; Top hint: {_learningStats.topHints[0]}"
-                    : "Learning disabled"
+                    : "Learning disabled",
+                applyMode = _applyMode.ToString(),
+                styleProfileName = SelectedStyleProfile != null ? SelectedStyleProfile.profileName : "Neutral Baseline",
+                bindPolicy = _assignNewProfileToExistingGlobalVolume ? "ON" : "OFF"
             };
 
             if (_activeTastePolicy != null)

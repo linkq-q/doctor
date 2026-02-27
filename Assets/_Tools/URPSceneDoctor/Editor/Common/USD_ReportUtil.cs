@@ -26,6 +26,9 @@ namespace URPSceneDoctor.Editor
             var sb = new StringBuilder();
             sb.AppendLine("# URP Scene Doctor Report");
             sb.AppendLine($"- Tool Version: {report.toolVersion}");
+            sb.AppendLine($"- Apply Mode: {report.applyMode}");
+            sb.AppendLine($"- Style Profile: {report.styleProfileName}");
+            sb.AppendLine($"- Bind Policy: {report.bindPolicy}");
             sb.AppendLine("- Project Info");
             sb.AppendLine($"  - Unity: {report.snapshot.unityVersion}");
             sb.AppendLine($"  - URP: {report.snapshot.urpPackageVersion}");
