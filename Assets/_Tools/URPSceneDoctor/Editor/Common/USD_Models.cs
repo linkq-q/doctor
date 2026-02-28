@@ -63,6 +63,10 @@ namespace URPSceneDoctor.Editor
         [NonSerialized] public Dictionary<string, float> volumeKeyValues = new Dictionary<string, float>();
         public List<USD_KeyFloatEntry> volumeKeyValuesSerialized = new List<USD_KeyFloatEntry>();
 
+        public string curvePreset;
+        public float smhShadowsBias;
+        public float smhHighlightsBias;
+
         public void SetVolumeKey(string key, float value)
         {
             volumeKeyValues[key] = value;

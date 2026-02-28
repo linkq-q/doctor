@@ -1,68 +1,33 @@
-# URP Scene Doctor v0.63（AI Propose → Apply → Evidence → Judge）
+# URP Scene Doctor v0.63.1（Force Diversity + CA + Curves/SMH）
 
-## 你现在能做什么
-在 `Tools/URP Scene Doctor` 中新增 **AI 调参 / AI Tuning** 页面：
-1. **Capture Base**：固定 BEFORE 基准（snapshot + 截图 + metrics）。
-2. **Propose Two Variants (AI)**：生成 A/B 两套参数方案（白名单字段）。
-3. **Run Variant A/B 或 Run Both**：自动克隆并应用新 profile，产出 AFTER 证据与 delta。
-4. **Human Judge**：给 A/B 打分、选问题标签、保存 annotation，并保存 A/B 偏好。
+## 本版重点
+- AI Propose 增加 **Force Diversity**：A/B 不够分化会自动重试，仍不够则程序性拉开 Variant B。
+- 白名单扩展到 `CA.postExposure / CA.contrast / CA.saturation`。
+- Apply 扩展到：Bloom / Vignette / FilmGrain(Thin1+0.6) / WhiteBalance / ColorAdjustments / ColorCurves / ShadowsMidtonesHighlights。
+- 方法论硬规则本地兜底：
+  - Vignette 固定 0.2/0.2
+  - Grain 固定 Thin1 + 0.6
+  - Bloom.scatter 固定 0.5
+  - Bloom.intensity 按亮度桶并受 ceiling 限制
 
----
+## 快速流程
+1. AI Tuning 页面点击 **Capture Base**。
+2. 点击 **Propose Two Variants (AI)**。
+3. 查看顶部 Force Diversity 状态（OK / Applied / Failed）。
+4. 点击 **Run Both** 生成 A/B 证据。
+5. 在 Human Judge 保存 A/B annotation 与 pairwise。
 
-## 目录结构（每次运行）
+## 输出目录
 `Assets/_Tools/URPSceneDoctor/AITuningRuns/<RunId>/`
+- `proposal/ai_param_proposal.json`
+- `variant_A|B/profile.asset`
+- `variant_A|B/snapshot_after.json`
+- `variant_A|B/image_metrics_after.json`
+- `variant_A|B/image_metrics_diff.json`
+- `variant_A|B/deltaPatch.json`
+- `compare/pairwise_pref.json`
 
-- `base/`
-  - `snapshot_before.json`
-  - `image_metrics_before.json`
-  - `screenshots_before/*`
-- `proposal/`
-  - `ai_param_proposal.json`
-- `variant_A/`、`variant_B/`
-  - `profile.asset`
-  - `snapshot_after.json`
-  - `image_metrics_after.json`
-  - `image_metrics_diff.json`
-  - `deltaPatch.json`
-  - `screenshots_after/*`
-  - `annotation.json`（你保存后生成）
-- `compare/`
-  - `pairwise_pref.json`（你保存偏好后生成）
-
----
-
-## 参数白名单（v0.63）
-- `Bloom.intensity`
-- `Bloom.scatter`
-- `WB.temperature`
-- `WB.tint`
-- `Vig.intensity`
-- `Vig.smoothness`
-- `Grain.intensity`
-
-系统会自动 clamp 到安全范围，超出值会被压回合法区间。
-
----
-
-## 新手建议（通俗版）
-- **先固定 Base，再跑 A/B**：这样你比较的是“同一起跑线”，不是随机结果。
-- **AI 是提案，不是裁判**：最后以你的 `annotation.json` 和 `pairwise_pref.json` 为准。
-- **优先看三件事**：过曝比例（overexposure_ratio）、中心对比（center_contrast_ratio）、冷暖倾向（warm_cool_balance）。
-- **不要直接覆盖旧资产**：本工具会创建新 profile，方便回滚和复查。
-
----
-
-## 快速上手（3 分钟）
-1. 打开要调的场景。
-2. 切到 `AI Tuning`。
-3. 选目标风格（clean / warm / moody）。
-4. 点 **Capture Base**。
-5. 点 **Propose Two Variants (AI)**。
-6. 点 **Run Both**。
-7. 在 Human Judge 区：
-   - 给 A、B 各打分；
-   - 给每个方案选 1~3 个问题标签；
-   - 保存 annotation；
-   - 选择 A better / B better / Tie 并保存。
-
-完成后就形成了可学习的闭环数据。
+## 验证建议
+- 检查 `proposal` 中 A/B 至少 3 个字段不同。
+- 检查 `deltaPatch` 是否包含 CA + Bloom/WB/Vig/Grain 变更。
+- 检查 A/B after metrics 至少 2 个关键指标存在差异。

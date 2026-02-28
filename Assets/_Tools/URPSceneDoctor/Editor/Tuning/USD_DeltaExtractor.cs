@@ -26,6 +26,10 @@ namespace URPSceneDoctor.Editor
             AddIfChanged(patch, "Volume.enabledOverridesCount", before.enabledOverrides.Count, after.enabledOverrides.Count, string.Empty, false);
 
             AddVolumeKeyDiffs(patch, before, after);
+            AddIfChanged(patch, "Curves.preset", before.curvePreset ?? string.Empty, after.curvePreset ?? string.Empty);
+            AddIfChanged(patch, "SMH.shadowsBias", before.smhShadowsBias, after.smhShadowsBias, string.Empty, true);
+            AddIfChanged(patch, "SMH.highlightsBias", before.smhHighlightsBias, after.smhHighlightsBias, string.Empty, true);
+
 
             if (patch.changedFields.Count > 0)
             {
@@ -59,6 +63,13 @@ namespace URPSceneDoctor.Editor
 
                 patch.recommendedRanges.Add($"VolumeKey.{key} changed by {d.ToString("+0.###;-0.###", CultureInfo.InvariantCulture)}");
             }
+        }
+
+
+        private static void AddIfChanged(USD_DeltaPatch patch, string path, string before, string after)
+        {
+            if (before == after) return;
+            patch.changedFields.Add(new USD_DeltaField { path = path, before = before, after = after, deltaHint = $"{before} -> {after}" });
         }
 
         private static void AddIfChanged(USD_DeltaPatch patch, string path, float before, float after, string suffix, bool numericDelta)

@@ -7,7 +7,7 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.63";
+        public const string ToolVersion = "v0.63.1";
 
         private string[] _tabs;
         private int _selectedTab;

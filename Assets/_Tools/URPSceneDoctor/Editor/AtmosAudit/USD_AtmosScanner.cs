@@ -195,6 +195,20 @@ namespace URPSceneDoctor.Editor
                 snapshot.SetVolumeKey("Grain.intensity", grain.intensity.value);
                 snapshot.warnings.Add("FilmGrain.type=" + grain.type.value);
             }
+
+            if (profile.TryGet(out ColorCurves curves) && curves.active)
+            {
+                var keyCount = curves.master.value != null && curves.master.value.keys != null ? curves.master.value.keys.Length : 0;
+                snapshot.curvePreset = keyCount >= 4 ? "S_Curve_Strong" : "S_Curve_Soft";
+            }
+
+            if (profile.TryGet(out ShadowsMidtonesHighlights smh) && smh.active)
+            {
+                var s = smh.shadows.value;
+                var h = smh.highlights.value;
+                snapshot.smhShadowsBias = (s.x + s.y + s.z) / 3f;
+                snapshot.smhHighlightsBias = (h.x + h.y + h.z) / 3f;
+            }
         }
 
         private static void TryCaptureRendererData(USD_ScanSnapshot snapshot, UniversalRenderPipelineAsset urp)
