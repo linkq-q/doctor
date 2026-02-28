@@ -23,6 +23,14 @@ namespace URPSceneDoctor.Editor
             };
         }
 
+
+        private static USD_StyleProfileAsset GetOrCreate(string path, string name, string desc, float intensity,
+            float peMin, float peMax, float cMin, float cMax, float sMin, float sMax, float tMin, float tMax,
+            float vMin, bool bloom)
+        {
+            return GetOrCreate(path, name, desc, intensity, peMin, peMax, cMin, cMax, sMin, sMax, tMin, tMax, vMin, vMin, bloom);
+        }
+
         private static USD_StyleProfileAsset GetOrCreate(string path, string name, string desc, float intensity,
             float peMin, float peMax, float cMin, float cMax, float sMin, float sMax, float tMin, float tMax,
             float vMin, float vMax, bool bloom)

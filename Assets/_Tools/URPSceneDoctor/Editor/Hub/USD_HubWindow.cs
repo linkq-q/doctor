@@ -7,7 +7,7 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.6";
+        public const string ToolVersion = "v0.63";
 
         private string[] _tabs;
         private int _selectedTab;
@@ -19,6 +19,8 @@ namespace URPSceneDoctor.Editor
         private USD_PipelinePackModule _pipelinePackModule;
         private USD_BatchSamplerModule _batchSamplerModule;
         private USD_AiAssistModule _aiAssistModule;
+        private USD_AiTuningModule _aiTuningModule;
+        private Vector2 _rightScroll;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
         private USD_ApplyMode _applyMode = USD_ApplyMode.SafeNeutral;
@@ -74,6 +76,7 @@ namespace URPSceneDoctor.Editor
             _pipelinePackModule = new USD_PipelinePackModule();
             _batchSamplerModule = new USD_BatchSamplerModule();
             _aiAssistModule = new USD_AiAssistModule();
+            _aiTuningModule = new USD_AiTuningModule();
 
             var settings = USD_Settings.GetOrCreateSettings();
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
@@ -91,7 +94,7 @@ namespace URPSceneDoctor.Editor
             _tabs = new[]
             {
                 USD_Localization.T("tab.atmos"), USD_Localization.T("tab.render"), USD_Localization.T("tab.tuning"), USD_Localization.T("tab.evidence"),
-                USD_Localization.T("tab.delta"), USD_Localization.T("tab.pipeline"), USD_Localization.T("tab.batch"), USD_Localization.T("tab.ai"), USD_Localization.T("tab.reports"), USD_Localization.T("tab.settings")
+                USD_Localization.T("tab.delta"), USD_Localization.T("tab.pipeline"), USD_Localization.T("tab.batch"), USD_Localization.T("tab.ai"), USD_Localization.T("tab.aituning"), USD_Localization.T("tab.reports"), USD_Localization.T("tab.settings")
             };
         }
 
@@ -148,7 +151,8 @@ namespace URPSceneDoctor.Editor
 
         private void DrawContent()
         {
-            EditorGUILayout.BeginVertical();
+            EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true));
+            _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll, GUILayout.ExpandHeight(true));
             switch (_selectedTab)
             {
                 case 0: _atmosModule.DrawUI(this); break;
@@ -159,8 +163,9 @@ namespace URPSceneDoctor.Editor
                 case 5: _pipelinePackModule.DrawUI(this); break;
                 case 6: _batchSamplerModule.DrawUI(this); break;
                 case 7: _aiAssistModule.DrawUI(this); break;
-                case 8: DrawReports(); break;
-                case 9: DrawSettings(); break;
+                case 8: _aiTuningModule.DrawUI(this); break;
+                case 9: DrawReports(); break;
+                case 10: DrawSettings(); break;
             }
 
             if (_lastResult != null)
@@ -173,6 +178,7 @@ namespace URPSceneDoctor.Editor
                 }
             }
 
+            EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
         }
 
