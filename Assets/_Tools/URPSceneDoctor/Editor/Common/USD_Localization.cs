@@ -21,6 +21,7 @@ namespace URPSceneDoctor.Editor
             {"tab.delta", ("增量学习库", "Delta Library")},
             {"tab.pipeline", ("管线包", "Pipeline Pack")},
             {"tab.batch", ("批量采样", "Batch Sampler")},
+            {"tab.ai", ("AI 助手", "AI Assist")},
             {"tab.reports", ("报告", "Reports")},
             {"tab.settings", ("设置", "Settings")},
             {"btn.scan", ("扫描", "Scan")},

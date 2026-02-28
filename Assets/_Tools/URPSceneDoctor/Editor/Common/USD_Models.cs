@@ -224,4 +224,74 @@ namespace URPSceneDoctor.Editor
         public List<USD_LearningFieldStat> topChangedFields = new List<USD_LearningFieldStat>();
         public List<string> topHints = new List<string>();
     }
+
+    [Serializable]
+    public sealed class USD_ImageMetricsShot
+    {
+        public string id;
+        public string path;
+        public string brightness_bucket;
+        public float luma_mean;
+        public float luma_std;
+        public float overexposure_ratio;
+        public float center_contrast_ratio;
+        public float saturation_mean;
+        public float warm_cool_balance;
+    }
+
+    [Serializable]
+    public sealed class USD_ImageMetricsAggregate
+    {
+        public string brightness_bucket;
+        public float luma_mean;
+        public float luma_std;
+        public float overexposure_ratio;
+        public float center_contrast_ratio;
+        public float saturation_mean;
+        public float warm_cool_balance;
+    }
+
+    [Serializable]
+    public sealed class USD_ImageMetricsFile
+    {
+        public string sceneName;
+        public string timestamp;
+        public List<USD_ImageMetricsShot> shots = new List<USD_ImageMetricsShot>();
+        public USD_ImageMetricsAggregate aggregate = new USD_ImageMetricsAggregate();
+    }
+
+    [Serializable]
+    public sealed class USD_AiLabelDraft
+    {
+        public string recommended_style_goal_id;
+        public int recommended_score_1to10;
+        public List<string> recommended_issue_tags_top3 = new List<string>();
+        public List<string> next_steps = new List<string>();
+        public string short_reason;
+        public string source;
+        public string timestamp;
+        public string error;
+    }
+
+    [Serializable]
+    public sealed class USD_RuleDraftItem
+    {
+        public string field;
+        public string op;
+        public string value;
+        public string note;
+    }
+
+    [Serializable]
+    public sealed class USD_RuleDraft
+    {
+        public string proposed_rule_id;
+        public string severity_suggestion;
+        public List<USD_RuleDraftItem> trigger_candidates = new List<USD_RuleDraftItem>();
+        public List<string> recommendation_template = new List<string>();
+        public List<string> verification_steps = new List<string>();
+        public string source;
+        public string timestamp;
+        public string error;
+    }
 }

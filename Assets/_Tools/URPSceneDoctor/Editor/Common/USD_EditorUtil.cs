@@ -102,10 +102,17 @@ namespace URPSceneDoctor.Editor
         public string policyBrightnessBucket = "Mid";
         public string batchSceneRoot = "Assets/_Tools/URPSceneDoctor/SamplePacks";
         public string language = "中文";
+        public string promptLanguage = "zh";
         public string cameraMode = "Auto";
         public Camera manualCamera;
         public USD_LabelCatalogAsset labelCatalog;
         public USD_TastePolicyAsset defaultTastePolicy;
+        public string llmProvider = "Off";
+        public string llmBaseUrl = "https://api.deepseek.com";
+        public string llmModel = "deepseek-chat";
+        public int llmTimeoutSec = 30;
+        public int llmMaxTokens = 600;
+        public float llmTemperature = 0.2f;
 
         public static USD_Settings GetOrCreateSettings()
         {

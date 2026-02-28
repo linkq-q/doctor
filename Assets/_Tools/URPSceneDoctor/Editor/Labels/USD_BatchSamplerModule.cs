@@ -25,6 +25,8 @@ namespace URPSceneDoctor.Editor
         public List<string> keyVolumeDeltas = new List<string>();
         public int userRating;
         public List<string> selectedIssues = new List<string>();
+        public string aiDraftStatus;
+        public string userFinalLabel;
         public string status;
         public string failReason;
     }
@@ -155,7 +157,7 @@ namespace URPSceneDoctor.Editor
                     var before = USD_AtmosScanner.CaptureSnapshot();
                     rec.beforeSnapshotPath = sampleDir + "/snapshot_before.json";
                     File.WriteAllText(rec.beforeSnapshotPath, JsonUtility.ToJson(before, true));
-                    USD_ScreenshotUtil.CaptureSixShots(sampleDir + "/before", settings.screenshotWidth, settings.screenshotHeight, pick.camera);
+                    var beforeShots = USD_ScreenshotUtil.CaptureSixShots(sampleDir + "/before", settings.screenshotWidth, settings.screenshotHeight, pick.camera);
 
                     var styleProfile = ResolveStyleProfile(styleGoal, hub);
                     rec.styleProfileName = styleProfile != null ? styleProfile.profileName : "";
@@ -164,7 +166,13 @@ namespace URPSceneDoctor.Editor
                     var after = USD_AtmosScanner.CaptureSnapshot();
                     rec.afterSnapshotPath = sampleDir + "/snapshot_after.json";
                     File.WriteAllText(rec.afterSnapshotPath, JsonUtility.ToJson(after, true));
-                    USD_ScreenshotUtil.CaptureSixShots(sampleDir + "/after", settings.screenshotWidth, settings.screenshotHeight, pick.camera);
+                    var afterShots = USD_ScreenshotUtil.CaptureSixShots(sampleDir + "/after", settings.screenshotWidth, settings.screenshotHeight, pick.camera);
+
+                    var metricsBefore = USD_VisionLiteUtil.BuildMetrics(rec.sceneName, sampleTs, sampleDir, beforeShots);
+                    var metricsAfter = USD_VisionLiteUtil.BuildMetrics(rec.sceneName, sampleTs, sampleDir, afterShots);
+                    File.WriteAllText(sampleDir + "/image_metrics_before.json", JsonUtility.ToJson(metricsBefore, true));
+                    File.WriteAllText(sampleDir + "/image_metrics_after.json", JsonUtility.ToJson(metricsAfter, true));
+                    File.WriteAllText(sampleDir + "/image_metrics_diff.json", JsonUtility.ToJson(USD_VisionLiteUtil.BuildDiff(metricsBefore, metricsAfter), true));
 
                     var patch = USD_DeltaExtractor.Extract(rec.sceneName, rec.beforeSnapshotPath, rec.afterSnapshotPath);
                     rec.deltaPatchPath = sampleDir + "/deltaPatch.json";
@@ -172,6 +180,9 @@ namespace URPSceneDoctor.Editor
                     rec.keyVolumeDeltas = patch != null ? patch.changedFields.Where(x => x.path.StartsWith("VolumeKey.")).Take(6).Select(x => x.path + ": " + x.deltaHint).ToList() : new List<string>();
 
                     WriteTasteNote(sampleDir + "/taste_note.json", rec, patch);
+
+                    var aiDraft = USD_AiAssistModule.GenerateDraft(settings, sampleDir, rec.sceneName, catalog, before, after, patch, metricsBefore, metricsAfter);
+                    rec.aiDraftStatus = string.IsNullOrEmpty(aiDraft.error) ? "generated" : "fallback:" + aiDraft.error;
 
                     var summaryMd = new StringBuilder();
                     summaryMd.AppendLine("# Batch Sample Evidence");
@@ -211,6 +222,29 @@ namespace URPSceneDoctor.Editor
         {
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Quick Labeling", EditorStyles.boldLabel);
+            if (!string.IsNullOrEmpty(rec.evidencePackPath))
+            {
+                var draftPath = rec.evidencePackPath + "/ai_label_draft.json";
+                if (File.Exists(draftPath))
+                {
+                    var draft = JsonUtility.FromJson<USD_AiLabelDraft>(File.ReadAllText(draftPath));
+                    EditorGUILayout.HelpBox("AI Draft: " + (draft != null ? draft.short_reason : "(invalid)"), MessageType.None);
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Accept AI Draft", GUILayout.Width(140)) && draft != null)
+                    {
+                        rec.styleGoalId = draft.recommended_style_goal_id;
+                        rec.userRating = draft.recommended_score_1to10;
+                        rec.selectedIssues = draft.recommended_issue_tags_top3 != null ? new List<string>(draft.recommended_issue_tags_top3) : new List<string>();
+                        rec.userFinalLabel = "accepted_ai";
+                    }
+                    if (GUILayout.Button("Reject AI Draft", GUILayout.Width(140)))
+                    {
+                        rec.userFinalLabel = "rejected_ai";
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+
             var styleNames = catalog.styles.Select(USD_LabelCatalogUtil.DisplayStyle).ToArray();
             if (styleNames.Length > 0)
             {
@@ -236,6 +270,7 @@ namespace URPSceneDoctor.Editor
                 {
                     var notePath = rec.evidencePackPath + "/taste_note.json";
                     SaveAnnotationToTasteNote(notePath, rec);
+                    rec.userFinalLabel = rec.styleGoalId + ":" + rec.userRating;
                     if (!string.IsNullOrEmpty(_lastSummaryPath))
                     {
                         File.WriteAllText(_lastSummaryPath, JsonUtility.ToJson(_lastSummary, true));
@@ -284,7 +319,7 @@ namespace URPSceneDoctor.Editor
         private static string BuildCsv(USD_BatchSummary summary)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("scenePath,sceneName,cameraMode,cameraName,styleGoalId,styleProfileName,beforeSnapshotPath,afterSnapshotPath,deltaPatchPath,evidencePackPath,keyVolumeDeltas,userRating,selectedIssues,status,failReason");
+            sb.AppendLine("scenePath,sceneName,cameraMode,cameraName,styleGoalId,styleProfileName,beforeSnapshotPath,afterSnapshotPath,deltaPatchPath,evidencePackPath,keyVolumeDeltas,userRating,selectedIssues,aiDraftStatus,userFinalLabel,status,failReason");
             foreach (var r in summary.records)
             {
                 string Escape(string s) => '"' + (s ?? string.Empty).Replace("\"", "\"\"") + '"';
@@ -292,7 +327,7 @@ namespace URPSceneDoctor.Editor
                 {
                     Escape(r.scenePath), Escape(r.sceneName), Escape(r.cameraMode), Escape(r.cameraName), Escape(r.styleGoalId), Escape(r.styleProfileName),
                     Escape(r.beforeSnapshotPath), Escape(r.afterSnapshotPath), Escape(r.deltaPatchPath), Escape(r.evidencePackPath), Escape(string.Join("|", r.keyVolumeDeltas)),
-                    Escape(r.userRating.ToString()), Escape(string.Join("|", r.selectedIssues)), Escape(r.status), Escape(r.failReason)
+                    Escape(r.userRating.ToString()), Escape(string.Join("|", r.selectedIssues)), Escape(r.aiDraftStatus), Escape(r.userFinalLabel), Escape(r.status), Escape(r.failReason)
                 }));
             }
             return sb.ToString();

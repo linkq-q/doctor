@@ -74,6 +74,13 @@ namespace URPSceneDoctor.Editor
             File.WriteAllText(root + "/snapshot_after.json", JsonUtility.ToJson(after, true));
             var afterShots = USD_ScreenshotUtil.CaptureSixShots(root + "/after", hub.ScreenshotWidth, hub.ScreenshotHeight, captureCamera);
 
+            var metricsBefore = USD_VisionLiteUtil.BuildMetrics(sceneName, ts, root, beforeShots);
+            var metricsAfter = USD_VisionLiteUtil.BuildMetrics(sceneName, ts, root, afterShots);
+            File.WriteAllText(root + "/image_metrics_before.json", JsonUtility.ToJson(metricsBefore, true));
+            File.WriteAllText(root + "/image_metrics_after.json", JsonUtility.ToJson(metricsAfter, true));
+            var diffMetrics = USD_VisionLiteUtil.BuildDiff(metricsBefore, metricsAfter);
+            File.WriteAllText(root + "/image_metrics_diff.json", JsonUtility.ToJson(diffMetrics, true));
+
             var patch = USD_DeltaExtractor.Extract(sceneName, root + "/snapshot_before.json", root + "/snapshot_after.json");
             if (patch != null)
             {

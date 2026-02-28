@@ -7,7 +7,7 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.55";
+        public const string ToolVersion = "v0.6";
 
         private string[] _tabs;
         private int _selectedTab;
@@ -18,6 +18,7 @@ namespace URPSceneDoctor.Editor
         private USD_DeltaLibraryModule _deltaLibraryModule;
         private USD_PipelinePackModule _pipelinePackModule;
         private USD_BatchSamplerModule _batchSamplerModule;
+        private USD_AiAssistModule _aiAssistModule;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
         private USD_ApplyMode _applyMode = USD_ApplyMode.SafeNeutral;
@@ -72,6 +73,7 @@ namespace URPSceneDoctor.Editor
             _deltaLibraryModule = new USD_DeltaLibraryModule();
             _pipelinePackModule = new USD_PipelinePackModule();
             _batchSamplerModule = new USD_BatchSamplerModule();
+            _aiAssistModule = new USD_AiAssistModule();
 
             var settings = USD_Settings.GetOrCreateSettings();
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
@@ -89,7 +91,7 @@ namespace URPSceneDoctor.Editor
             _tabs = new[]
             {
                 USD_Localization.T("tab.atmos"), USD_Localization.T("tab.render"), USD_Localization.T("tab.tuning"), USD_Localization.T("tab.evidence"),
-                USD_Localization.T("tab.delta"), USD_Localization.T("tab.pipeline"), USD_Localization.T("tab.batch"), USD_Localization.T("tab.reports"), USD_Localization.T("tab.settings")
+                USD_Localization.T("tab.delta"), USD_Localization.T("tab.pipeline"), USD_Localization.T("tab.batch"), USD_Localization.T("tab.ai"), USD_Localization.T("tab.reports"), USD_Localization.T("tab.settings")
             };
         }
 
@@ -156,8 +158,9 @@ namespace URPSceneDoctor.Editor
                 case 4: _deltaLibraryModule.DrawUI(this); break;
                 case 5: _pipelinePackModule.DrawUI(this); break;
                 case 6: _batchSamplerModule.DrawUI(this); break;
-                case 7: DrawReports(); break;
-                case 8: DrawSettings(); break;
+                case 7: _aiAssistModule.DrawUI(this); break;
+                case 8: DrawReports(); break;
+                case 9: DrawSettings(); break;
             }
 
             if (_lastResult != null)
@@ -344,10 +347,22 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("cameraMode"));
             EditorGUILayout.PropertyField(so.FindProperty("manualCamera"));
             EditorGUILayout.PropertyField(so.FindProperty("language"));
+            EditorGUILayout.PropertyField(so.FindProperty("promptLanguage"));
             EditorGUILayout.PropertyField(so.FindProperty("enableLearningHints"));
             EditorGUILayout.PropertyField(so.FindProperty("policyBrightnessBucket"));
             EditorGUILayout.PropertyField(so.FindProperty("labelCatalog"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultTastePolicy"));
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("LLM Provider", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(so.FindProperty("llmProvider"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmBaseUrl"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmModel"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmTimeoutSec"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmMaxTokens"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmTemperature"));
+            var apiKey = USD_LlmClient.GetApiKey();
+            var newApiKey = EditorGUILayout.PasswordField("api_key", apiKey);
+            if (newApiKey != apiKey) USD_LlmClient.SetApiKey(newApiKey);
             so.ApplyModifiedProperties();
 
             if (settings.labelCatalog == null) settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
