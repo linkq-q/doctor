@@ -100,6 +100,11 @@ namespace URPSceneDoctor.Editor
         public int screenshotHeight = 1080;
         public bool enableLearningHints = true;
         public string policyBrightnessBucket = "Mid";
+        public string batchSceneRoot = "Assets/_Tools/URPSceneDoctor/SamplePacks";
+        public string language = "中文";
+        public string cameraMode = "Auto";
+        public Camera manualCamera;
+        public USD_LabelCatalogAsset labelCatalog;
         public USD_TastePolicyAsset defaultTastePolicy;
 
         public static USD_Settings GetOrCreateSettings()
@@ -112,14 +117,20 @@ namespace URPSceneDoctor.Editor
                 {
                     settings.defaultTastePolicy = USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
                     EditorUtility.SetDirty(settings);
-                    AssetDatabase.SaveAssets();
                 }
+                if (settings.labelCatalog == null)
+                {
+                    settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
+                    EditorUtility.SetDirty(settings);
+                }
+                AssetDatabase.SaveAssets();
                 return settings;
             }
 
             USD_EditorUtil.EnsureFolder("Assets/_Tools/URPSceneDoctor/Config");
             settings = CreateInstance<USD_Settings>();
             settings.defaultTastePolicy = USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
+            settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
             AssetDatabase.CreateAsset(settings, settingsPath);
             AssetDatabase.SaveAssets();
             return settings;

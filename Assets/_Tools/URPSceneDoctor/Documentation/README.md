@@ -1,63 +1,58 @@
-# URP Scene Doctor v0.5（Learning MVD + 方法论落地）
+# URP Scene Doctor v0.55（Batch Sampler + LabelCatalog + Auto Camera + i18n）
 
-## 导入 unitypackage
-1. 打开 Unity URP 项目（推荐 Unity 2022.3 + URP 14）。
-2. 菜单 `Assets > Import Package > Custom Package...`。
-3. 选择 `URPSceneDoctor_v0.5.unitypackage` 导入。
+## 新增能力
+1. **Batch Sampler**：对白名单场景批量输出 evidence + delta + taste_note，并生成 batch_summary(json/csv)。
+2. **LabelCatalog 可扩展标签**：风格目标/问题标签可在资产中直接编辑，无需改代码。
+3. **自动相机绑定**：Auto picker（MainCamera优先）+ SceneView fallback。
+4. **中英双语切换**：Settings 支持语言切换（中文/English/Auto）。
 
-## v0.5 核心能力
-1. Learning MVD：Snapshot 记录关键后处理数值（volumeKeyValues）。
-2. Delta Patch：输出 VolumeKey 的 before/after 数值变化。
-3. 方法论 v1.0：TastePolicy + Policy Checker（Vig/Bloom/Grain + Bloom brightness bucket）。
-4. Evidence Pack：自动生成 `taste_note.json` 模板，并从 deltaPatch 预填 actions。
+## LabelCatalog
+- 默认资产：`Assets/_Tools/URPSceneDoctor/Config/LabelCatalogs/DefaultLabelCatalog.asset`
+- 在 Settings 中可直接指定/编辑 `labelCatalog`。
+- 字段：styles / issues（含 id, zh/en 名称）。
+- 要求：id 唯一（Hub 设置页会提示重复 id）。
 
-## Learning MVD（Snapshot/Delta）
-Snapshot 会记录以下关键键值（若 override active）：
-- `CA.postExposure`, `CA.contrast`, `CA.saturation`
-- `WB.temperature`, `WB.tint`
-- `Vig.intensity`, `Vig.smoothness`
-- `Bloom.intensity`, `Bloom.scatter`
-- `Grain.intensity`
+## Batch Sampler 使用
+1. 打开 `Tools/URP Scene Doctor`，切到 **Batch Sampler**。
+2. `Refresh Scenes` 扫描 `batchSceneRoot`（默认 `Assets/_Tools/URPSceneDoctor/SamplePacks`）。
+3. 勾选场景，点击 `Batch Run`。
+4. 每个场景流程：
+   - Open Scene
+   - Auto camera pick
+   - BEFORE snapshot/shots
+   - Apply VisibleDemo
+   - AFTER snapshot/shots
+   - Extract deltaPatch
+   - 生成 taste_note 初稿
+5. 支持失败继续跑；失败原因写入 summary 和 errors.log。
 
-在 Tuning 页执行 `Capture BEFORE/AFTER -> Extract Delta Patch` 后，
-`deltaPatch.changedFields` 会包含 `VolumeKey.*` 的具体数值变化。
+## 输出目录
+`Assets/_Tools/URPSceneDoctor/BatchRuns/{RunId}/`
+- `Samples/{SceneName}/{timestamp}/`（每场景样本）
+- `batch_summary.json`
+- `batch_summary.csv`
+- `errors.log`（有失败时）
 
-## 方法论 v1.0（TastePolicy + Checker）
-默认策略：`YourTAStyle_v1`（配置于 `Config/TastePolicies`）
-- 优先级顺序：明暗分区 → 主视觉 → 基调统一 → 冷暖对比 → 收口 → 精修
-- 硬规则（至少）：
-  - Vignette intensity/smoothness 约 0.2
-  - FilmGrain intensity 约 0.6
-  - Bloom scatter 约 0.5
-- Bloom 亮度桶（Settings 的 `policyBrightnessBucket`）：
-  - High / Mid / Low
-  - 各自检查 Bloom intensity 目标区间，并受 ceiling 限制
+## 快速标注（Batch Sampler 页）
+- Style Goal 下拉（来自 LabelCatalog）
+- Rating (1-10)
+- Issue tags 多选（来自 LabelCatalog）
+- `Save Annotation` 回写：
+  - 样本目录下 `taste_note.json`
+  - `batch_summary.json/csv`
 
-Atmosphere Doctor / Report / Evidence Summary 会显示 Policy Checklist（Pass/Warnings）。
+## 自动相机绑定
+- Camera Mode：Auto / Manual / SceneView（Settings）
+- Auto 规则：
+  1) MainCamera tag
+  2) enabled + active 且非 UI-only camera
+  3) 无可用相机时回退 SceneView
 
-## Evidence Pack（含 taste_note）
-输出目录：
-`Assets/_Tools/URPSceneDoctor/EvidencePacks/{SceneName}/{timestamp}/`
+## 安全说明
+- 不修改 Packages/ProjectSettings。
+- 所有输出位于 `Assets/_Tools/URPSceneDoctor/**`。
+- 批处理单场景失败不阻断后续场景。
 
-包含：
-- before/after 截图
-- `snapshot_before.json` / `snapshot_after.json`
-- `deltaPatch.json`（自动从 before/after 提取）
-- `summary.md`, `diff.json`, `report.md`, `report.json`
-- `taste_note.json`（模板 + actions 预填）
-
-## 安全原则
-- 默认不修改现有资产（除用户主动 Apply/Install）。
-- 输出文件统一在 `Assets/_Tools/URPSceneDoctor/**` 下。
-- Apply/安装流程保持 Undo 记录。
-
-## 自测步骤（v0.5）
-1. 打开 Demo 场景。
-2. Tuning：Capture BEFORE。
-3. 手动改 `CA.contrast / WB.temperature / Bloom.intensity / Vig.intensity / Grain.intensity`。
-4. Capture AFTER。
-5. Extract Delta Patch，确认 `VolumeKey.*` 至少 4 条变化。
-6. 生成 Evidence Pack，确认 summary 出现 Policy Checklist，且输出 `taste_note.json`。
-
-## 说明
-Learning v0.5 只学习“参数范围/顺序”，不做图像审美判断。
+## 已知限制
+- Batch 仅处理本地白名单场景，不做在线下载。
+- i18n 当前覆盖核心 Hub 页签与核心按钮文案，后续可继续扩展。

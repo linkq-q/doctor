@@ -7,9 +7,9 @@ namespace URPSceneDoctor.Editor
 {
     public sealed class USD_HubWindow : EditorWindow
     {
-        public const string ToolVersion = "v0.45";
+        public const string ToolVersion = "v0.55";
 
-        private readonly string[] _tabs = { "Atmosphere Doctor", "Render Doctor", "Tuning (Before/After)", "Evidence Pack", "Delta Library", "Pipeline Pack", "Reports", "Settings" };
+        private string[] _tabs;
         private int _selectedTab;
         private USD_AtmosAuditModule _atmosModule;
         private USD_RenderAuditModule _renderModule;
@@ -17,6 +17,7 @@ namespace URPSceneDoctor.Editor
         private USD_EvidencePackModule _evidenceModule;
         private USD_DeltaLibraryModule _deltaLibraryModule;
         private USD_PipelinePackModule _pipelinePackModule;
+        private USD_BatchSamplerModule _batchSamplerModule;
         private USD_ModuleResult _lastResult;
         private bool _assignNewProfileToExistingGlobalVolume;
         private USD_ApplyMode _applyMode = USD_ApplyMode.SafeNeutral;
@@ -38,6 +39,7 @@ namespace URPSceneDoctor.Editor
         public USD_ApplyMode ApplyMode => _applyMode;
         public USD_StyleProfileAsset SelectedStyleProfile => (_styleProfiles != null && _styleProfiles.Length > 0 && _selectedStyleIndex >= 0 && _selectedStyleIndex < _styleProfiles.Length) ? _styleProfiles[_selectedStyleIndex] : null;
         public bool AssignNewProfileToExistingGlobalVolume => _assignNewProfileToExistingGlobalVolume;
+
         public USD_BrightnessBucket PolicyBrightnessBucket
         {
             get
@@ -69,6 +71,7 @@ namespace URPSceneDoctor.Editor
             _evidenceModule = new USD_EvidencePackModule();
             _deltaLibraryModule = new USD_DeltaLibraryModule();
             _pipelinePackModule = new USD_PipelinePackModule();
+            _batchSamplerModule = new USD_BatchSamplerModule();
 
             var settings = USD_Settings.GetOrCreateSettings();
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
@@ -77,12 +80,23 @@ namespace URPSceneDoctor.Editor
             _learningEnabled = settings.enableLearningHints;
             _styleProfiles = USD_StyleProfileUtil.GetOrCreateBuiltIns();
             _selectedStyleIndex = 0;
+            RefreshTabs();
             RefreshHeaderSnapshot(true);
+        }
+
+        private void RefreshTabs()
+        {
+            _tabs = new[]
+            {
+                USD_Localization.T("tab.atmos"), USD_Localization.T("tab.render"), USD_Localization.T("tab.tuning"), USD_Localization.T("tab.evidence"),
+                USD_Localization.T("tab.delta"), USD_Localization.T("tab.pipeline"), USD_Localization.T("tab.batch"), USD_Localization.T("tab.reports"), USD_Localization.T("tab.settings")
+            };
         }
 
         private void OnFocus()
         {
             RefreshHeaderSnapshot(true);
+            RefreshTabs();
         }
 
         private void OnGUI()
@@ -105,14 +119,14 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.HelpBox($"URP Scene Doctor {ToolVersion} | Scene: {ActiveSceneName} | URP: {snapshot.activeURPAssetName} | Renderer: {snapshot.activeRendererDataName} | Global Volume: {snapshot.hasGlobalVolume}", MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Refresh Header", GUILayout.Width(130))) RefreshHeaderSnapshot(true);
-            if (GUILayout.Button("Open Demo Scene", GUILayout.Width(150)))
+            if (GUILayout.Button(USD_Localization.Label("刷新头信息", "Refresh Header"), GUILayout.Width(130))) RefreshHeaderSnapshot(true);
+            if (GUILayout.Button(USD_Localization.Label("打开示例场景", "Open Demo Scene"), GUILayout.Width(150)))
             {
                 USD_DemoSceneUtil.OpenOrCreateDemoSceneWithPrompt();
                 RefreshHeaderSnapshot(true);
             }
 
-            if (GUILayout.Button("Quick Verify", GUILayout.Width(150))) RunQuickVerify();
+            if (GUILayout.Button(USD_Localization.Label("快速验证", "Quick Verify"), GUILayout.Width(150))) RunQuickVerify();
             EditorGUILayout.EndHorizontal();
         }
 
@@ -141,8 +155,9 @@ namespace URPSceneDoctor.Editor
                 case 3: _evidenceModule.DrawUI(this); break;
                 case 4: _deltaLibraryModule.DrawUI(this); break;
                 case 5: _pipelinePackModule.DrawUI(this); break;
-                case 6: DrawReports(); break;
-                case 7: DrawSettings(); break;
+                case 6: _batchSamplerModule.DrawUI(this); break;
+                case 7: DrawReports(); break;
+                case 8: DrawSettings(); break;
             }
 
             if (_lastResult != null)
@@ -161,10 +176,10 @@ namespace URPSceneDoctor.Editor
         public void DrawExecutionButtons(IToolModule module)
         {
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Scan")) RunModule(module, USD_RunMode.Scan, true);
-            if (GUILayout.Button("Dry Run")) RunModule(module, USD_RunMode.DryRun, true);
-            if (GUILayout.Button("Apply")) RunModule(module, USD_RunMode.Apply, true);
-            if (GUILayout.Button("Export Report") && _lastResult != null) ExportLastReport();
+            if (GUILayout.Button(USD_Localization.T("btn.scan"))) RunModule(module, USD_RunMode.Scan, true);
+            if (GUILayout.Button(USD_Localization.T("btn.dryrun"))) RunModule(module, USD_RunMode.DryRun, true);
+            if (GUILayout.Button(USD_Localization.T("btn.apply"))) RunModule(module, USD_RunMode.Apply, true);
+            if (GUILayout.Button(USD_Localization.T("btn.export")) && _lastResult != null) ExportLastReport();
             EditorGUILayout.EndHorizontal();
 
             if (module.ModuleName == "Atmosphere Doctor") DrawApplyOptions();
@@ -321,19 +336,31 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("snapshotsRoot"));
             EditorGUILayout.PropertyField(so.FindProperty("patchesRoot"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultRulePackPath"));
+            EditorGUILayout.PropertyField(so.FindProperty("batchSceneRoot"));
             EditorGUILayout.PropertyField(so.FindProperty("verboseLogs"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultApplyStrength"));
             EditorGUILayout.PropertyField(so.FindProperty("screenshotWidth"));
             EditorGUILayout.PropertyField(so.FindProperty("screenshotHeight"));
+            EditorGUILayout.PropertyField(so.FindProperty("cameraMode"));
+            EditorGUILayout.PropertyField(so.FindProperty("manualCamera"));
+            EditorGUILayout.PropertyField(so.FindProperty("language"));
             EditorGUILayout.PropertyField(so.FindProperty("enableLearningHints"));
             EditorGUILayout.PropertyField(so.FindProperty("policyBrightnessBucket"));
+            EditorGUILayout.PropertyField(so.FindProperty("labelCatalog"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultTastePolicy"));
             so.ApplyModifiedProperties();
+
+            if (settings.labelCatalog == null) settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
+            if (settings.labelCatalog != null && USD_LabelCatalogUtil.HasDuplicateIds(settings.labelCatalog, out var dup))
+            {
+                EditorGUILayout.HelpBox("Duplicate id in label catalog: " + dup, MessageType.Warning);
+            }
 
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : _activeTastePolicy;
             _screenshotWidth = settings.screenshotWidth;
             _screenshotHeight = settings.screenshotHeight;
             _learningEnabled = settings.enableLearningHints;
+            RefreshTabs();
         }
     }
 }

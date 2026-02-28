@@ -36,7 +36,10 @@ namespace URPSceneDoctor.Editor
         public void DrawUI(USD_HubWindow hub)
         {
             EditorGUILayout.HelpBox("Generate shareable evidence pack: before/after shots + summary + diff.", MessageType.Info);
-            _overrideCamera = (Camera)EditorGUILayout.ObjectField("Optional Camera (Mode B)", _overrideCamera, typeof(Camera), true);
+            _overrideCamera = (Camera)EditorGUILayout.ObjectField("Optional Camera Override", _overrideCamera, typeof(Camera), true);
+            var pick = USD_CameraPicker.PickAutoCamera();
+            EditorGUILayout.LabelField("Auto Camera:", pick.camera != null ? pick.camera.name : "(SceneView fallback)");
+            EditorGUILayout.LabelField("Pick Reason:", pick.reason);
             if (GUILayout.Button("Create Evidence Pack"))
             {
                 CreatePack(hub);
@@ -60,15 +63,16 @@ namespace URPSceneDoctor.Editor
             USD_EditorUtil.EnsureFolder(root + "/before");
             USD_EditorUtil.EnsureFolder(root + "/after");
 
+            var captureCamera = ResolveCaptureCamera();
             var before = USD_AtmosScanner.CaptureSnapshot();
             File.WriteAllText(root + "/snapshot_before.json", JsonUtility.ToJson(before, true));
-            var beforeShots = USD_ScreenshotUtil.CaptureSixShots(root + "/before", hub.ScreenshotWidth, hub.ScreenshotHeight, _overrideCamera);
+            var beforeShots = USD_ScreenshotUtil.CaptureSixShots(root + "/before", hub.ScreenshotWidth, hub.ScreenshotHeight, captureCamera);
 
             var applyResult = hub.RunAtmosForExternal(ts, USD_RunMode.Apply);
             var afterScan = hub.RunAtmosForExternal(ts + "_after", USD_RunMode.Scan);
             var after = afterScan.Snapshot ?? USD_AtmosScanner.CaptureSnapshot();
             File.WriteAllText(root + "/snapshot_after.json", JsonUtility.ToJson(after, true));
-            var afterShots = USD_ScreenshotUtil.CaptureSixShots(root + "/after", hub.ScreenshotWidth, hub.ScreenshotHeight, _overrideCamera);
+            var afterShots = USD_ScreenshotUtil.CaptureSixShots(root + "/after", hub.ScreenshotWidth, hub.ScreenshotHeight, captureCamera);
 
             var patch = USD_DeltaExtractor.Extract(sceneName, root + "/snapshot_before.json", root + "/snapshot_after.json");
             if (patch != null)
@@ -168,6 +172,17 @@ namespace URPSceneDoctor.Editor
             sb.AppendLine("- " + root);
             sb.AppendLine("- taste_note.json template generated");
             return sb.ToString();
+        }
+
+
+        private Camera ResolveCaptureCamera()
+        {
+            if (_overrideCamera != null) return _overrideCamera;
+            var settings = USD_Settings.GetOrCreateSettings();
+            if (settings != null && settings.cameraMode == "Manual" && settings.manualCamera != null) return settings.manualCamera;
+            if (settings != null && settings.cameraMode == "SceneView") return null;
+            var auto = USD_CameraPicker.PickAutoCamera();
+            return auto.camera;
         }
 
         private static void WriteShotSection(StringBuilder sb, string section, List<USD_ShotCapture> shots)
