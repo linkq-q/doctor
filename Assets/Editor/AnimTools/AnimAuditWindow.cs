@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using TA.ToolSuite;
 
 namespace AnimTools
 {
@@ -20,8 +22,8 @@ namespace AnimTools
         private Dictionary<string, bool> _selected = new Dictionary<string, bool>();
         private Vector2 _scroll;
 
-        private string _reportDir = "Assets/AnimAuditReports";
-        private string _controllerDir = "Assets/AnimGeneratedControllers";
+        private string _reportDir;
+        private string _controllerDir;
         private bool _generateReports = true;
         private bool _generateControllers = true;
         private GeneratorMode _mode = GeneratorMode.Simple;
@@ -36,6 +38,9 @@ namespace AnimTools
 
         private void OnEnable()
         {
+            var sceneName = EditorSceneManager.GetActiveScene().name;
+            _reportDir = TTS_ReportRouter.RouteAnimReportsOutputDir(sceneName);
+            _controllerDir = TTS_ReportRouter.RouteAnimControllersOutputDir(sceneName);
             LoadOrCreateRules();
             BuildServices();
         }

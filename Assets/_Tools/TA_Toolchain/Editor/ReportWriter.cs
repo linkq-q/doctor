@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using TA.ToolSuite;
 
 namespace TA.Toolchain.RenderAudit
 {
@@ -28,7 +30,8 @@ namespace TA.Toolchain.RenderAudit
         {
             if (string.IsNullOrWhiteSpace(outputDir))
             {
-                return Path.GetFullPath("Assets/_Tools/TA_Toolchain/Reports/");
+                var sceneName = EditorSceneManager.GetActiveScene().name;
+                return TTS_ReportRouter.ToAbsolutePath(TTS_ReportRouter.RouteRenderAuditOutputDir(sceneName));
             }
 
             if (outputDir.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))

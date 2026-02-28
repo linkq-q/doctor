@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using TA.ToolSuite;
 
 namespace TA.Toolchain.RenderAudit
 {
@@ -168,7 +170,9 @@ namespace TA.Toolchain.RenderAudit
 
         private void OpenReportsFolder()
         {
-            var dir = _config != null ? _config.outputDir : "Assets/_Tools/TA_Toolchain/Reports/";
+            var sceneName = EditorSceneManager.GetActiveScene().name;
+            var routed = TTS_ReportRouter.RouteRenderAuditOutputDir(sceneName);
+            var dir = _config != null && !string.IsNullOrWhiteSpace(_config.outputDir) ? _config.outputDir : routed;
             var full = Path.GetFullPath(dir.StartsWith("Assets", StringComparison.OrdinalIgnoreCase) ? dir : Path.Combine("Assets", dir));
             if (!Directory.Exists(full))
             {
