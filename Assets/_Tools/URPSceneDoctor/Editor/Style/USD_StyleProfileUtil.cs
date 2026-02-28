@@ -16,7 +16,7 @@ namespace URPSceneDoctor.Editor
             USD_EditorUtil.EnsureFolder(Root);
             return new[]
             {
-                GetOrCreate(NeutralPath, "Neutral Baseline", "Near-neutral baseline profile.", 0.15f, 0, 0, 0, 0, 0, 0, 0, 0, false),
+                GetOrCreate(NeutralPath, "Neutral Baseline", "Near-neutral baseline profile.", 0.15f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false),
                 GetOrCreate(CleanPath, "Clean Stylized", "Clear, clean stylized look.", 0.75f, 0.05f, 0.15f, 10, 18, 5, 12, 2, 6, 0.05f, 0.12f, false),
                 GetOrCreate(WarmPath, "Warm Dusk", "Warm dusk mood.", 0.8f, 0.05f, 0.15f, 8, 16, 6, 14, 10, 18, 0.05f, 0.1f, false),
                 GetOrCreate(MoodyPath, "Moody Cool", "Cool moody atmosphere.", 0.8f, 0.0f, 0.08f, 12, 22, -2, 6, -15, -8, 0.08f, 0.18f, false)
