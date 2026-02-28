@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace URPSceneDoctor.Editor
 {
@@ -23,6 +25,8 @@ namespace URPSceneDoctor.Editor
             AddIfChanged(patch, "Volume.hasGlobalVolume", before.hasGlobalVolume, after.hasGlobalVolume, string.Empty, false);
             AddIfChanged(patch, "Volume.enabledOverridesCount", before.enabledOverrides.Count, after.enabledOverrides.Count, string.Empty, false);
 
+            AddVolumeKeyDiffs(patch, before, after);
+
             if (patch.changedFields.Count > 0)
             {
                 foreach (var field in patch.changedFields)
@@ -32,6 +36,29 @@ namespace URPSceneDoctor.Editor
             }
 
             return patch;
+        }
+
+        private static void AddVolumeKeyDiffs(USD_DeltaPatch patch, USD_ScanSnapshot before, USD_ScanSnapshot after)
+        {
+            var keys = new HashSet<string>(before.volumeKeyValues.Keys);
+            keys.UnionWith(after.volumeKeyValues.Keys);
+            foreach (var key in keys.OrderBy(x => x))
+            {
+                var b = before.volumeKeyValues.ContainsKey(key) ? before.volumeKeyValues[key] : 0f;
+                var a = after.volumeKeyValues.ContainsKey(key) ? after.volumeKeyValues[key] : 0f;
+                var d = a - b;
+                if (System.Math.Abs(d) <= 0.001f) continue;
+
+                patch.changedFields.Add(new USD_DeltaField
+                {
+                    path = "VolumeKey." + key,
+                    before = b.ToString("0.000", CultureInfo.InvariantCulture),
+                    after = a.ToString("0.000", CultureInfo.InvariantCulture),
+                    deltaHint = d.ToString("+0.000;-0.000", CultureInfo.InvariantCulture)
+                });
+
+                patch.recommendedRanges.Add($"VolumeKey.{key} changed by {d.ToString("+0.###;-0.###", CultureInfo.InvariantCulture)}");
+            }
         }
 
         private static void AddIfChanged(USD_DeltaPatch patch, string path, float before, float after, string suffix, bool numericDelta)

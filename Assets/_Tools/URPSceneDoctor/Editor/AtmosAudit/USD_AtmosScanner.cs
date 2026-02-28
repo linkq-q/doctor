@@ -6,8 +6,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
-
-// ✅ 用别名解决 PackageInfo 歧义（只能写在 using 区域）
 using UPM_PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace URPSceneDoctor.Editor
@@ -16,10 +14,12 @@ namespace URPSceneDoctor.Editor
     {
         public static USD_ScanSnapshot CaptureSnapshot()
         {
-            var snapshot = new USD_ScanSnapshot();
-            snapshot.unityVersion = Application.unityVersion;
-            snapshot.urpPackageVersion = GetUrpVersion();
-            snapshot.platformHint = EditorUserBuildSettings.activeBuildTarget.ToString();
+            var snapshot = new USD_ScanSnapshot
+            {
+                unityVersion = Application.unityVersion,
+                urpPackageVersion = GetUrpVersion(),
+                platformHint = EditorUserBuildSettings.activeBuildTarget.ToString()
+            };
 
             try
             {
@@ -31,7 +31,6 @@ namespace URPSceneDoctor.Editor
                 snapshot.activeQualityLevel = "unknown";
             }
 
-            // --- URP / Pipeline ---
             try
             {
                 var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
@@ -44,17 +43,13 @@ namespace URPSceneDoctor.Editor
                 var urpPath = AssetDatabase.GetAssetPath(urp);
                 snapshot.activeURPAssetGuid = AssetDatabase.AssetPathToGUID(urpPath);
                 snapshot.activeURPAssetName = urp.name;
-
                 snapshot.shadowDistance = urp.shadowDistance;
                 snapshot.shadowCascadeCount = urp.shadowCascadeCount;
                 snapshot.supportsHDR = urp.supportsHDR;
                 snapshot.msaaSampleCount = urp.msaaSampleCount;
                 snapshot.renderScale = urp.renderScale;
-
                 snapshot.additionalLightsEnabled = urp.additionalLightsRenderingMode != LightRenderingMode.Disabled;
                 snapshot.additionalLightsPerObjectLimit = urp.maxAdditionalLightsCount;
-
-                // RendererData 在不同 URP 版本 API 不同：反射读取，取不到就跳过（不影响主流程）
                 TryCaptureRendererData(snapshot, urp);
             }
             catch (Exception e)
@@ -62,7 +57,6 @@ namespace URPSceneDoctor.Editor
                 snapshot.warnings.Add("Failed to read URP fields: " + e.Message);
             }
 
-            // --- Lighting ---
             try
             {
                 var mainLight = RenderSettings.sun;
@@ -79,7 +73,6 @@ namespace URPSceneDoctor.Editor
                 snapshot.ambientMode = RenderSettings.ambientMode.ToString();
                 snapshot.ambientIntensity = RenderSettings.ambientIntensity;
                 snapshot.hasSkyboxMaterial = RenderSettings.skybox != null;
-
                 var probes = UnityEngine.Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None);
                 snapshot.reflectionProbeCount = probes.Length;
                 snapshot.hasAnyReflectionProbe = probes.Length > 0;
@@ -89,22 +82,18 @@ namespace URPSceneDoctor.Editor
                 snapshot.warnings.Add("Failed to read lighting fields: " + e.Message);
             }
 
-            // --- Volumes ---
             try
             {
                 var volumes = UnityEngine.Object.FindObjectsByType<Volume>(FindObjectsSortMode.None);
                 snapshot.volumeCountTotal = volumes.Length;
-
                 var globals = volumes.Where(v => v != null && v.isGlobal).ToList();
                 snapshot.hasGlobalVolume = globals.Count > 0;
                 snapshot.hasMultipleOverlappingGlobalLikeVolumes = globals.Count > 1;
 
-                var selected = globals.FirstOrDefault();
+                var selected = globals.FirstOrDefault(v => v.gameObject.name == "USD_GlobalVolume") ?? globals.FirstOrDefault();
                 if (selected != null)
                 {
                     snapshot.globalVolumeObjectName = selected.gameObject.name;
-
-                    // sharedProfile 更安全（不改实例化）
                     var profile = selected.sharedProfile;
                     if (profile != null)
                     {
@@ -114,9 +103,10 @@ namespace URPSceneDoctor.Editor
 
                         foreach (var component in profile.components)
                         {
-                            if (component != null && component.active)
-                                snapshot.enabledOverrides.Add(component.GetType().Name);
+                            if (component != null && component.active) snapshot.enabledOverrides.Add(component.GetType().Name);
                         }
+
+                        FillVolumeKeyValues(snapshot, profile);
                     }
                 }
 
@@ -127,32 +117,25 @@ namespace URPSceneDoctor.Editor
                 snapshot.warnings.Add("Failed to read volume fields: " + e.Message);
             }
 
-            // --- Renderers ---
             try
             {
                 var renderers = UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-
                 var materials = new HashSet<Material>();
                 var shaders = new HashSet<Shader>();
-                int transparentCount = 0;
+                var transparentCount = 0;
 
                 foreach (var renderer in renderers)
                 {
                     if (renderer == null) continue;
-
-                    bool rendererIsTransparent = false;
+                    var rendererIsTransparent = false;
                     foreach (var mat in renderer.sharedMaterials)
                     {
                         if (mat == null) continue;
-
                         materials.Add(mat);
                         if (mat.shader != null) shaders.Add(mat.shader);
-
-                        if (!rendererIsTransparent && mat.renderQueue >= (int)RenderQueue.Transparent)
-                            rendererIsTransparent = true;
+                        if (!rendererIsTransparent && mat.renderQueue >= (int)RenderQueue.Transparent) rendererIsTransparent = true;
                     }
 
-                    // ✅ 按 Renderer 计数（每个 renderer 最多 +1）
                     if (rendererIsTransparent) transparentCount++;
                 }
 
@@ -160,8 +143,6 @@ namespace URPSceneDoctor.Editor
                 snapshot.materialCountDistinct = materials.Count;
                 snapshot.shaderCountDistinct = shaders.Count;
                 snapshot.transparentRendererCount = transparentCount;
-
-                // heuristic
                 snapshot.hasManyDifferentShaders = shaders.Count > 20;
             }
             catch (Exception e)
@@ -169,12 +150,10 @@ namespace URPSceneDoctor.Editor
                 snapshot.warnings.Add("Failed to read renderer fields: " + e.Message);
             }
 
-            // --- Scene sanity ---
             try
             {
                 var s = SceneManager.GetActiveScene();
-                if (!s.isLoaded || string.IsNullOrWhiteSpace(s.name))
-                    snapshot.warnings.Add("Active scene is unsaved.");
+                if (!s.isLoaded || string.IsNullOrWhiteSpace(s.name)) snapshot.warnings.Add("Active scene is unsaved.");
             }
             catch
             {
@@ -184,13 +163,45 @@ namespace URPSceneDoctor.Editor
             return snapshot;
         }
 
+        private static void FillVolumeKeyValues(USD_ScanSnapshot snapshot, VolumeProfile profile)
+        {
+            if (profile.TryGet(out ColorAdjustments ca) && ca.active)
+            {
+                snapshot.SetVolumeKey("CA.postExposure", ca.postExposure.value);
+                snapshot.SetVolumeKey("CA.contrast", ca.contrast.value);
+                snapshot.SetVolumeKey("CA.saturation", ca.saturation.value);
+            }
+
+            if (profile.TryGet(out WhiteBalance wb) && wb.active)
+            {
+                snapshot.SetVolumeKey("WB.temperature", wb.temperature.value);
+                snapshot.SetVolumeKey("WB.tint", wb.tint.value);
+            }
+
+            if (profile.TryGet(out Vignette vig) && vig.active)
+            {
+                snapshot.SetVolumeKey("Vig.intensity", vig.intensity.value);
+                snapshot.SetVolumeKey("Vig.smoothness", vig.smoothness.value);
+            }
+
+            if (profile.TryGet(out Bloom bloom) && bloom.active)
+            {
+                snapshot.SetVolumeKey("Bloom.intensity", bloom.intensity.value);
+                snapshot.SetVolumeKey("Bloom.scatter", bloom.scatter.value);
+            }
+
+            if (profile.TryGet(out FilmGrain grain) && grain.active)
+            {
+                snapshot.SetVolumeKey("Grain.intensity", grain.intensity.value);
+                snapshot.warnings.Add("FilmGrain.type=" + grain.type.value);
+            }
+        }
+
         private static void TryCaptureRendererData(USD_ScanSnapshot snapshot, UniversalRenderPipelineAsset urp)
         {
             try
             {
                 var urpType = urp.GetType();
-
-                // URP 某些版本是 scriptableRendererData
                 var prop = urpType.GetProperty("scriptableRendererData");
                 if (prop != null)
                 {
@@ -204,7 +215,6 @@ namespace URPSceneDoctor.Editor
                     }
                 }
 
-                // 备选：rendererData
                 var prop2 = urpType.GetProperty("rendererData");
                 if (prop2 != null)
                 {

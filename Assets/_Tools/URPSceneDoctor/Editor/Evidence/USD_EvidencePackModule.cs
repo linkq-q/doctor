@@ -7,6 +7,27 @@ using UnityEngine;
 
 namespace URPSceneDoctor.Editor
 {
+    [System.Serializable]
+    public sealed class USD_TasteActionNote
+    {
+        public string knob;
+        public string before;
+        public string after;
+        public string intent;
+        public string stop_rule;
+    }
+
+    [System.Serializable]
+    public sealed class USD_TasteNoteTemplate
+    {
+        public string scene;
+        public string[] tags;
+        public string goal_mood;
+        public string[] before_issues;
+        public USD_TasteActionNote[] actions;
+        public string after_evaluation;
+    }
+
     public sealed class USD_EvidencePackModule : IToolModule
     {
         public string ModuleName => "Evidence Pack";
@@ -40,18 +61,21 @@ namespace URPSceneDoctor.Editor
             USD_EditorUtil.EnsureFolder(root + "/after");
 
             var before = USD_AtmosScanner.CaptureSnapshot();
-            var beforePath = root + "/snapshot_before.json";
-            File.WriteAllText(beforePath, JsonUtility.ToJson(before, true));
+            File.WriteAllText(root + "/snapshot_before.json", JsonUtility.ToJson(before, true));
             var beforeShots = USD_ScreenshotUtil.CaptureSixShots(root + "/before", hub.ScreenshotWidth, hub.ScreenshotHeight, _overrideCamera);
 
             var applyResult = hub.RunAtmosForExternal(ts, USD_RunMode.Apply);
             var afterScan = hub.RunAtmosForExternal(ts + "_after", USD_RunMode.Scan);
             var after = afterScan.Snapshot ?? USD_AtmosScanner.CaptureSnapshot();
-            var afterPath = root + "/snapshot_after.json";
-            File.WriteAllText(afterPath, JsonUtility.ToJson(after, true));
+            File.WriteAllText(root + "/snapshot_after.json", JsonUtility.ToJson(after, true));
             var afterShots = USD_ScreenshotUtil.CaptureSixShots(root + "/after", hub.ScreenshotWidth, hub.ScreenshotHeight, _overrideCamera);
 
-            var patch = string.IsNullOrEmpty(hub.OptionalDeltaPatchPath) ? null : USD_SnapshotUtil.LoadDeltaPatch(hub.OptionalDeltaPatchPath);
+            var patch = USD_DeltaExtractor.Extract(sceneName, root + "/snapshot_before.json", root + "/snapshot_after.json");
+            if (patch != null)
+            {
+                File.WriteAllText(root + "/deltaPatch.json", JsonUtility.ToJson(patch, true));
+            }
+
             var diff = USD_DiffUtil.BuildDiff(sceneName, ts, before, after, afterScan.WorkOrders, patch);
             File.WriteAllText(root + "/diff.json", JsonUtility.ToJson(diff, true));
 
@@ -62,15 +86,43 @@ namespace URPSceneDoctor.Editor
             File.Copy(reportMd, root + "/report.md", true);
             File.Copy(reportJson, root + "/report.json", true);
 
-            if (patch != null)
-            {
-                File.Copy(hub.OptionalDeltaPatchPath, root + "/deltaPatch.json", true);
-            }
-
             File.WriteAllText(root + "/summary.md", BuildSummary(hub, report, diff, root, beforeShots, afterShots));
+            GenerateTasteNoteTemplate(root, sceneName, patch);
+
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog("Evidence Pack Created", "Output: " + root, "OK");
             return root;
+        }
+
+        private static void GenerateTasteNoteTemplate(string root, string sceneName, USD_DeltaPatch patch)
+        {
+            var actions = new List<USD_TasteActionNote>();
+            if (patch != null)
+            {
+                foreach (var field in patch.changedFields.Where(x => x.path.StartsWith("VolumeKey.")))
+                {
+                    actions.Add(new USD_TasteActionNote
+                    {
+                        knob = field.path,
+                        before = field.before,
+                        after = field.after,
+                        intent = "",
+                        stop_rule = ""
+                    });
+                }
+            }
+
+            var note = new USD_TasteNoteTemplate
+            {
+                scene = sceneName,
+                tags = new[] { "mood", "lighting", "learning" },
+                goal_mood = "",
+                before_issues = new[] { "" },
+                actions = actions.ToArray(),
+                after_evaluation = ""
+            };
+
+            File.WriteAllText(root + "/taste_note.json", JsonUtility.ToJson(note, true));
         }
 
         private static string BuildSummary(USD_HubWindow hub, USD_Report report, USD_DiffReport diff, string root, List<USD_ShotCapture> beforeShots, List<USD_ShotCapture> afterShots)
@@ -88,6 +140,12 @@ namespace URPSceneDoctor.Editor
             sb.AppendLine($"- Style Profile: {(hub.SelectedStyleProfile != null ? hub.SelectedStyleProfile.profileName : "Neutral Baseline")}");
             sb.AppendLine($"- Bind Policy: {(hub.AssignNewProfileToExistingGlobalVolume ? "ON" : "OFF")}");
             sb.AppendLine($"- Matched Rules: P0={p0}, P1={p1}, P2={p2}");
+
+            sb.AppendLine("## Policy Checklist");
+            sb.AppendLine($"- Passed: {report.policyPassCount}");
+            sb.AppendLine($"- Warnings: {report.policyWarningCount}");
+            if (report.policyChecklist != null) report.policyChecklist.ForEach(x => sb.AppendLine("- " + x));
+
             sb.AppendLine("## Key Evidence");
             sb.AppendLine($"- Global Volume: {report.snapshot.hasGlobalVolume}");
             sb.AppendLine($"- Directional Shadow Enabled: {report.snapshot.dirLightShadowsEnabled}");
@@ -95,10 +153,6 @@ namespace URPSceneDoctor.Editor
             sb.AppendLine($"- Enabled Overrides: {report.snapshot.enabledOverrides.Count}");
             sb.AppendLine("## Applied Actions");
             report.appliedChanges.ForEach(x => sb.AppendLine("- " + x));
-            sb.AppendLine("## Key visual knobs");
-            var knobs = report.appliedChanges.Where(x => x.StartsWith("KeyVisualKnobs:")).Take(5).ToList();
-            if (knobs.Count == 0) sb.AppendLine("- (none)");
-            knobs.ForEach(x => sb.AppendLine("- " + x.Replace("KeyVisualKnobs:", string.Empty).Trim()));
 
             sb.AppendLine("## Key diff summary (Top 5)");
             foreach (var change in diff.pipelineChanges.Concat(diff.volumeChanges).Concat(diff.sceneChanges).Take(5))
@@ -106,16 +160,13 @@ namespace URPSceneDoctor.Editor
                 sb.AppendLine($"- {change.path}: {change.before} -> {change.after}");
             }
 
-            sb.AppendLine("## Personal Learned Hints");
-            report.personalDeltaHints.Take(5).ToList().ForEach(x => sb.AppendLine("- " + x));
-            if (report.personalDeltaHints.Count == 0) sb.AppendLine("- (none)");
-
             sb.AppendLine("## Repro Camera Shots");
             WriteShotSection(sb, "Before", beforeShots);
             WriteShotSection(sb, "After", afterShots);
 
             sb.AppendLine("## Output Folder");
             sb.AppendLine("- " + root);
+            sb.AppendLine("- taste_note.json template generated");
             return sb.ToString();
         }
 

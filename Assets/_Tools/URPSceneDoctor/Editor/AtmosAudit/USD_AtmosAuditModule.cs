@@ -31,6 +31,7 @@ namespace URPSceneDoctor.Editor
             result.WorkOrders.AddRange(USD_RuleEngine.Evaluate(snapshot, rulePack, deltaPatch, context.TastePolicy, context.LearningStats));
             result.Warnings.AddRange(snapshot.warnings);
             AppendPipelinePackRecommendations(result, snapshot);
+            AppendPolicyCheckerResults(result, snapshot, context);
 
             if (context.Mode == USD_RunMode.Apply)
             {
@@ -40,6 +41,36 @@ namespace URPSceneDoctor.Editor
             return result;
         }
 
+
+
+        private static void AppendPolicyCheckerResults(USD_ModuleResult result, USD_ScanSnapshot snapshot, USD_RunContext context)
+        {
+            var settings = USD_Settings.GetOrCreateSettings();
+            var bucketText = settings != null ? settings.policyBrightnessBucket : "Mid";
+            var bucket = bucketText == "High" ? USD_BrightnessBucket.High : (bucketText == "Low" ? USD_BrightnessBucket.Low : USD_BrightnessBucket.Mid);
+            var check = USD_PolicyChecker.Evaluate(snapshot, context.TastePolicy, bucket);
+            foreach (var item in check.items)
+            {
+                if (item.StartsWith("[WARN]")) result.Warnings.Add(item);
+            }
+
+            if (check.warnings > 0)
+            {
+                result.WorkOrders.Add(new USD_WorkOrder
+                {
+                    id = "USD-POLICY-CHK-001",
+                    title = "Taste Policy v1.0 hard-rule alignment required",
+                    severity = "P1",
+                    category = "Policy",
+                    subCategory = "Vignette/Bloom/Grain",
+                    diagnosis = "Current post-processing key values deviate from methodology hard rules.",
+                    sortScore = 0.95f,
+                    evidence = new System.Collections.Generic.List<string>(check.items),
+                    prescriptions = { new USD_Prescription { priority = 1, actionText = "Align Vig/Bloom/Grain according to YourTAStyle_v1", targetPathHint = "VolumeProfile", recommendedRange = "Use policy checklist in report/evidence" } },
+                    verification = new USD_Verification { steps = { "Run Evidence Pack and verify policy checklist warnings are cleared" }, performanceBudgetHint = "Bloom intensity follows brightness bucket and ceiling." }
+                });
+            }
+        }
 
         private static void AppendPipelinePackRecommendations(USD_ModuleResult result, USD_ScanSnapshot snapshot)
         {

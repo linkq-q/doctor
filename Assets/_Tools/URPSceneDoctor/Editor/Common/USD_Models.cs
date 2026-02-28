@@ -4,7 +4,14 @@ using System.Collections.Generic;
 namespace URPSceneDoctor.Editor
 {
     [Serializable]
-    public sealed class USD_ScanSnapshot
+    public sealed class USD_KeyFloatEntry
+    {
+        public string key;
+        public float value;
+    }
+
+    [Serializable]
+    public sealed class USD_ScanSnapshot : UnityEngine.ISerializationCallbackReceiver
     {
         public string unityVersion;
         public string urpPackageVersion;
@@ -51,6 +58,39 @@ namespace URPSceneDoctor.Editor
         public bool hasManyDifferentShaders;
 
         public List<string> warnings = new List<string>();
+
+        // v0.5 Learning MVD key knobs
+        [NonSerialized] public Dictionary<string, float> volumeKeyValues = new Dictionary<string, float>();
+        public List<USD_KeyFloatEntry> volumeKeyValuesSerialized = new List<USD_KeyFloatEntry>();
+
+        public void SetVolumeKey(string key, float value)
+        {
+            volumeKeyValues[key] = value;
+        }
+
+        public bool TryGetVolumeKey(string key, out float value)
+        {
+            return volumeKeyValues.TryGetValue(key, out value);
+        }
+
+        public void OnBeforeSerialize()
+        {
+            volumeKeyValuesSerialized.Clear();
+            foreach (var kv in volumeKeyValues)
+            {
+                volumeKeyValuesSerialized.Add(new USD_KeyFloatEntry { key = kv.Key, value = kv.Value });
+            }
+        }
+
+        public void OnAfterDeserialize()
+        {
+            volumeKeyValues = new Dictionary<string, float>();
+            if (volumeKeyValuesSerialized == null) return;
+            foreach (var kv in volumeKeyValuesSerialized)
+            {
+                if (kv != null && !string.IsNullOrEmpty(kv.key)) volumeKeyValues[kv.key] = kv.value;
+            }
+        }
     }
 
     [Serializable]
@@ -116,6 +156,9 @@ namespace URPSceneDoctor.Editor
         public List<string> appliedChanges = new List<string>();
         public List<string> warnings = new List<string>();
         public List<string> personalDeltaHints = new List<string>();
+        public int policyPassCount;
+        public int policyWarningCount;
+        public List<string> policyChecklist = new List<string>();
     }
 
     [Serializable]

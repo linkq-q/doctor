@@ -40,6 +40,7 @@ namespace URPSceneDoctor.Editor
             if (!string.IsNullOrEmpty(report.learningSummary)) sb.AppendLine($"  - Learning: {report.learningSummary}");
 
             sb.AppendLine($"- Taste Policy Applied: {report.tastePolicyName}");
+            sb.AppendLine($"- Policy Checklist: pass={report.policyPassCount}, warnings={report.policyWarningCount}");
             if (report.tastePriorityOrder != null && report.tastePriorityOrder.Count > 0)
                 sb.AppendLine("  - Priority Order: " + string.Join(" > ", report.tastePriorityOrder));
             if (report.tasteForbiddenActions != null && report.tasteForbiddenActions.Count > 0)
@@ -49,6 +50,10 @@ namespace URPSceneDoctor.Editor
             WriteSeverityGroup(sb, report.workOrders, "P0");
             WriteSeverityGroup(sb, report.workOrders, "P1");
             WriteSeverityGroup(sb, report.workOrders, "P2");
+
+            sb.AppendLine("- Policy Checklist Details");
+            if (report.policyChecklist == null || report.policyChecklist.Count == 0) sb.AppendLine("  - (none)");
+            else report.policyChecklist.ForEach(x => sb.AppendLine("  - " + x));
 
             sb.AppendLine("- Personal Delta Hints");
             if (report.personalDeltaHints == null || report.personalDeltaHints.Count == 0)

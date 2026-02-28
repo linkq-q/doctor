@@ -99,6 +99,7 @@ namespace URPSceneDoctor.Editor
         public int screenshotWidth = 1920;
         public int screenshotHeight = 1080;
         public bool enableLearningHints = true;
+        public string policyBrightnessBucket = "Mid";
         public USD_TastePolicyAsset defaultTastePolicy;
 
         public static USD_Settings GetOrCreateSettings()

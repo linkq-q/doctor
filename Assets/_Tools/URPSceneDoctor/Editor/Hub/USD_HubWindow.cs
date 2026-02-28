@@ -38,6 +38,14 @@ namespace URPSceneDoctor.Editor
         public USD_ApplyMode ApplyMode => _applyMode;
         public USD_StyleProfileAsset SelectedStyleProfile => (_styleProfiles != null && _styleProfiles.Length > 0 && _selectedStyleIndex >= 0 && _selectedStyleIndex < _styleProfiles.Length) ? _styleProfiles[_selectedStyleIndex] : null;
         public bool AssignNewProfileToExistingGlobalVolume => _assignNewProfileToExistingGlobalVolume;
+        public USD_BrightnessBucket PolicyBrightnessBucket
+        {
+            get
+            {
+                var b = USD_Settings.GetOrCreateSettings().policyBrightnessBucket;
+                return b == "High" ? USD_BrightnessBucket.High : (b == "Low" ? USD_BrightnessBucket.Low : USD_BrightnessBucket.Mid);
+            }
+        }
 
         private USD_TastePolicyAsset _activeTastePolicy;
         private USD_DeltaStats _learningStats;
@@ -260,6 +268,10 @@ namespace URPSceneDoctor.Editor
                 report.personalDeltaHints = new List<string>(_learningStats.topHints);
             }
 
+            var policyCheck = USD_PolicyChecker.Evaluate(report.snapshot, _activeTastePolicy, PolicyBrightnessBucket);
+            report.policyPassCount = policyCheck.passed;
+            report.policyWarningCount = policyCheck.warnings;
+            report.policyChecklist = policyCheck.items;
             return report;
         }
 
@@ -314,6 +326,7 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("screenshotWidth"));
             EditorGUILayout.PropertyField(so.FindProperty("screenshotHeight"));
             EditorGUILayout.PropertyField(so.FindProperty("enableLearningHints"));
+            EditorGUILayout.PropertyField(so.FindProperty("policyBrightnessBucket"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultTastePolicy"));
             so.ApplyModifiedProperties();
 

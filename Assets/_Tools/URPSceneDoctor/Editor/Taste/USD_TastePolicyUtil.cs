@@ -1,11 +1,11 @@
-using UnityEngine;
 using UnityEditor;
+using UnityEngine;
 
 namespace URPSceneDoctor.Editor
 {
     public static class USD_TastePolicyUtil
     {
-        public const string DefaultPolicyPath = "Assets/_Tools/URPSceneDoctor/Config/TastePolicies/DefaultTastePolicy.asset";
+        public const string DefaultPolicyPath = "Assets/_Tools/URPSceneDoctor/Config/TastePolicies/YourTAStyle_v1.asset";
 
         public static USD_TastePolicyAsset GetOrCreateDefaultPolicy()
         {
@@ -14,6 +14,8 @@ namespace URPSceneDoctor.Editor
 
             USD_EditorUtil.EnsureFolder("Assets/_Tools/URPSceneDoctor/Config/TastePolicies");
             policy = ScriptableObject.CreateInstance<USD_TastePolicyAsset>();
+            policy.policyName = "YourTAStyle_v1";
+            policy.version = "1.0";
             AssetDatabase.CreateAsset(policy, DefaultPolicyPath);
             AssetDatabase.SaveAssets();
             return policy;
@@ -38,15 +40,14 @@ namespace URPSceneDoctor.Editor
             {
                 if (item.subCategory == subCategory) return item.weight;
             }
-
             return 0.8f;
         }
 
         public static int PriorityOrderIndex(USD_TastePolicyAsset policy, string subCategory)
         {
-            if (policy == null || policy.priorityOrder == null) return 99;
-            var index = policy.priorityOrder.IndexOf(subCategory);
-            return index < 0 ? 99 : index;
+            if (policy == null || policy.priorityOrder == null) return int.MaxValue;
+            var idx = policy.priorityOrder.IndexOf(subCategory);
+            return idx >= 0 ? idx : int.MaxValue;
         }
     }
 }

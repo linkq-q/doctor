@@ -11,6 +11,7 @@ namespace URPSceneDoctor.Editor
         public string AfterSnapshotPath { get; private set; }
         public string LastDeltaPatchPath { get; private set; }
         public int LastChangedFieldsCount { get; private set; }
+        public string LastPolicyAlignment { get; private set; }
 
         public void DrawUI(USD_HubWindow hub)
         {
@@ -39,6 +40,10 @@ namespace URPSceneDoctor.Editor
                         LastChangedFieldsCount = patch.changedFields.Count;
                         LastDeltaPatchPath = USD_SnapshotUtil.SaveDeltaPatch(hub.ActiveSceneName, USD_EditorUtil.Timestamp, patch);
                         hub.OptionalDeltaPatchPath = LastDeltaPatchPath;
+                        var afterSnapshot = USD_SnapshotUtil.LoadSnapshot(AfterSnapshotPath);
+                        var policy = hub.ActiveTastePolicy;
+                        var check = USD_PolicyChecker.Evaluate(afterSnapshot, policy, hub.PolicyBrightnessBucket);
+                        LastPolicyAlignment = $"Pass={check.passed}, Warnings={check.warnings}";
                     }
                 }
             }
@@ -61,6 +66,7 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.LabelField("After Snapshot:", AfterSnapshotPath ?? "(none)");
             EditorGUILayout.LabelField("Delta Patch:", LastDeltaPatchPath ?? "(none)");
             EditorGUILayout.LabelField("Delta Summary:", $"changed fields = {LastChangedFieldsCount}");
+            EditorGUILayout.LabelField("Policy Alignment:", string.IsNullOrEmpty(LastPolicyAlignment) ? "(not evaluated)" : LastPolicyAlignment);
         }
 
         public USD_ModuleResult Execute(USD_RunContext context)

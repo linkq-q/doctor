@@ -1,74 +1,63 @@
-# URP Scene Doctor v0.45（unitypackage 用户手册）
+# URP Scene Doctor v0.5（Learning MVD + 方法论落地）
 
 ## 导入 unitypackage
 1. 打开 Unity URP 项目（推荐 Unity 2022.3 + URP 14）。
 2. 菜单 `Assets > Import Package > Custom Package...`。
-3. 选择 `URPSceneDoctor_v0.45.unitypackage` 导入。
+3. 选择 `URPSceneDoctor_v0.5.unitypackage` 导入。
 
-## 打开工具
-- 菜单：`Tools/URP Scene Doctor`。
-- 顶部显示版本、场景状态与 URP/Volume 概况。
+## v0.5 核心能力
+1. Learning MVD：Snapshot 记录关键后处理数值（volumeKeyValues）。
+2. Delta Patch：输出 VolumeKey 的 before/after 数值变化。
+3. 方法论 v1.0：TastePolicy + Policy Checker（Vig/Bloom/Grain + Bloom brightness bucket）。
+4. Evidence Pack：自动生成 `taste_note.json` 模板，并从 deltaPatch 预填 actions。
 
-## Pipeline Pack（Base Pack v1）
-新增 `Pipeline Pack` 页签，提供基础渲染资产包闭环：
-- Pack: `Base Pack v1`
-- Buttons: `Preflight / Install / Uninstall / Evidence Pack`
-- Status: 安装状态、URP版本、红黄绿检查结果
+## Learning MVD（Snapshot/Delta）
+Snapshot 会记录以下关键键值（若 override active）：
+- `CA.postExposure`, `CA.contrast`, `CA.saturation`
+- `WB.temperature`, `WB.tint`
+- `Vig.intensity`, `Vig.smoothness`
+- `Bloom.intensity`, `Bloom.scatter`
+- `Grain.intensity`
 
-### Base Pack v1 范围
-1. Distance Fog（自研）
-2. Volumetric Light（第三方 MIT，见 ThirdPartyNotices）
+在 Tuning 页执行 `Capture BEFORE/AFTER -> Extract Delta Patch` 后，
+`deltaPatch.changedFields` 会包含 `VolumeKey.*` 的具体数值变化。
 
-### Preflight 检查项
-- URP 是否启用、RendererData 可读性
-- Camera Post Processing 提示
-- Distance Fog 前置（Opaque/Depth 纹理提示 + 是否已安装 feature）
-- Volumetric Light 前置（URP 版本提示 + vendored 目录检查 + 是否已安装 feature）
+## 方法论 v1.0（TastePolicy + Checker）
+默认策略：`YourTAStyle_v1`（配置于 `Config/TastePolicies`）
+- 优先级顺序：明暗分区 → 主视觉 → 基调统一 → 冷暖对比 → 收口 → 精修
+- 硬规则（至少）：
+  - Vignette intensity/smoothness 约 0.2
+  - FilmGrain intensity 约 0.6
+  - Bloom scatter 约 0.5
+- Bloom 亮度桶（Settings 的 `policyBrightnessBucket`）：
+  - High / Mid / Low
+  - 各自检查 Bloom intensity 目标区间，并受 ceiling 限制
 
-### Install / Uninstall
-- Install：安全添加 RendererFeature，并在 `Assets/_Tools/URPSceneDoctor/PipelinePack/...` 下创建设置资产。
-- Uninstall：仅移除工具安装的 RendererFeature，不删除用户原有资源。
-- 安装/卸载动作会写出报告到 Reports 目录。
+Atmosphere Doctor / Report / Evidence Summary 会显示 Policy Checklist（Pass/Warnings）。
 
-### Pipeline Evidence Pack
-- 在 Pipeline Pack 页面点击 `Evidence Pack`：
-  1) Capture BEFORE
-  2) Install Base Pack v1
-  3) Capture AFTER
-  4) 输出 `summary.md + diff.json + before/after shots`
-
-## Apply Mode（Safe vs VisibleDemo）
-Atmosphere Doctor 面板支持 **Apply Options**：
-- `SafeNeutral`（默认）
-- `VisibleDemo`
-- Style Profile：Neutral Baseline / Clean Stylized / Warm Dusk / Moody Cool
-- Bind Policy 默认 OFF（不覆盖已有 Global Volume）
-
-## Style Profiles（风格倾向）
-- 风格参数由 `visibleIntensity` + 参数范围插值生成，不是写死单点值。
-- 仅作用于 Scene Doctor 新建 profile，不直接改用户原 profile。
-
-## Evidence Pack（可分享证据包）
+## Evidence Pack（含 taste_note）
 输出目录：
 `Assets/_Tools/URPSceneDoctor/EvidencePacks/{SceneName}/{timestamp}/`
+
+包含：
 - before/after 截图
-- summary.md
-- diff.json
-- report.md / report.json
-- snapshot_before.json / snapshot_after.json
+- `snapshot_before.json` / `snapshot_after.json`
+- `deltaPatch.json`（自动从 before/after 提取）
+- `summary.md`, `diff.json`, `report.md`, `report.json`
+- `taste_note.json`（模板 + actions 预填）
 
-## 第三方许可
-- 详见：`Assets/_Tools/URPSceneDoctor/Documentation/ThirdPartyNotices.md`
+## 安全原则
+- 默认不修改现有资产（除用户主动 Apply/Install）。
+- 输出文件统一在 `Assets/_Tools/URPSceneDoctor/**` 下。
+- Apply/安装流程保持 Undo 记录。
 
-## 推荐工作流（v0.45）
-1. Open Demo Scene
-2. Atmos Scan
-3. Pipeline Pack -> Preflight
-4. Pipeline Pack -> Install（Base Pack v1）
-5. Pipeline Pack -> Evidence Pack（比较前后）
-6. 真实项目中优先 SafeNeutral 与低强度参数
+## 自测步骤（v0.5）
+1. 打开 Demo 场景。
+2. Tuning：Capture BEFORE。
+3. 手动改 `CA.contrast / WB.temperature / Bloom.intensity / Vig.intensity / Grain.intensity`。
+4. Capture AFTER。
+5. Extract Delta Patch，确认 `VolumeKey.*` 至少 4 条变化。
+6. 生成 Evidence Pack，确认 summary 出现 Policy Checklist，且输出 `taste_note.json`。
 
-## 已知限制 / 性能注意
-- Base Pack v1 聚焦基础能力（Distance Fog + Volumetric Light），避免一次引入过多效果。
-- Volumetric Light 可能带来 GPU 开销，需按平台做预算验证。
-- Header 快照为节流缓存，不在 OnGUI 每帧重扫。
+## 说明
+Learning v0.5 只学习“参数范围/顺序”，不做图像审美判断。
