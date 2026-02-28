@@ -198,8 +198,17 @@ namespace URPSceneDoctor.Editor
 
             if (profile.TryGet(out ColorCurves curves) && curves.active)
             {
-                var keyCount = curves.master.value != null && curves.master.value.keys != null ? curves.master.value.keys.Length : 0;
-                snapshot.curvePreset = keyCount >= 4 ? "S_Curve_Strong" : "S_Curve_Soft";
+                var curve = curves.master.value;
+                if (curve != null)
+                {
+                    var q1 = curve.Evaluate(0.25f);
+                    var q3 = curve.Evaluate(0.75f);
+                    snapshot.curvePreset = (q3 - q1) >= 0.55f ? "S_Curve_Strong" : "S_Curve_Soft";
+                }
+                else
+                {
+                    snapshot.curvePreset = "S_Curve_Soft";
+                }
             }
 
             if (profile.TryGet(out ShadowsMidtonesHighlights smh) && smh.active)
