@@ -1,36 +1,37 @@
-# URP Scene Doctor v0.61（Full I18N + Newcomer Guide）
+# URP Scene Doctor v0.62（AI Draft Form + Visible Persistence）
 
-## 新增：全量双语文案系统
-- 新增 `USD_Loc` 统一入口：`T(key)` / `T(key,args)` / `C(key, tooltipKey)`。
-- 支持 Language：`Auto / 中文 / English`，设置保存到 `EditorPrefs`，切换后窗口立即刷新。
-- 文案来源优先 `LocTable_Default.asset`（自动创建到 `Assets/_Tools/URPSceneDoctor/Config/Localization/`），缺失时回退内置表。
-- 缺 key 会显示 `[[key]]` 并输出 warning，方便补齐。
+## v0.62 重点
+- AI Assist 从“弹窗 JSON”升级为“窗口内表单”：
+  - Draft Panel（AI 草稿）
+  - Final Annotation Panel（最终标注）
+- 每次关键操作（Generate/Accept/Reject/Save/Regenerate）都会：
+  - 在 UI 顶部显示结果（成功/失败）
+  - 写入可审计文件
+  - 支持一键打开输出目录/文件
+- 修复 Accept/Reject 无反应：增加点击日志、异常捕获、busy guard 与落盘反馈。
 
-## 新手引导（HelpBox + Tooltip）
-以下页面已增加一句话说明与关键按钮 tooltip：
-- Settings（LLM 配置与离线降级说明）
-- Evidence Pack（Before/After 与输出目录说明）
-- Tuning（BEFORE/AFTER/Delta 的正确步骤）
-- AI Assist（AI 草稿需人工确认，不做云端自动训练）
-- Batch Sampler（批量场景运行，单场景失败不中断）
+## AI Assist 输出文件（样本目录）
+1. `ai_label_draft.json`
+   - 保存 AI 草稿（timestamp/provider/model/raw/parsed/status/error）。
+2. `annotation.json`
+   - 保存最终确认标注（style/score/tags/next_steps/user_note/source/timestamp）。
+3. `ai_action_log.jsonl`
+   - 每次动作追加审计行（action/result/error/timestamp）。
 
-## 如何切换语言
-1. 打开 `Tools/URP Scene Doctor`。
-2. 在 `Settings` 页找到 `Language`。
-3. 选择 `Auto / 中文 / English`。
-4. UI 会立即刷新。
+## AI Assist 使用流程（推荐）
+1. 选择 Sample/Evidence Folder。
+2. 点击 Generate（或 Regenerate）。
+3. 在 Draft Panel 里检查并可编辑：style/score/tags/next steps。
+4. 点击 Accept（写入最终标注）或 Reject（仅记录状态，不删除草稿）。
+5. 在 Final Annotation Panel 进一步编辑，点击 Save Annotation。
 
-## 如何扩展文案 key
-1. 打开（或首次运行后自动生成）
-   `Assets/_Tools/URPSceneDoctor/Config/Localization/LocTable_Default.asset`。
-2. 新增 entry：`key / zh / en / note`。
-3. 在代码中使用 `USD_Loc.T("your.key")` 或 `USD_Loc.C("your.key", "tooltip.key")`。
+## Batch 模式同步
+- 若样本位于 `BatchRuns` 且检测到 `batch_summary.json/csv`，Accept/Save 会同步：
+  - `aiDraftStatus`
+  - `userFinalLabel`
+  - `lastUpdated`
 
-## i18n 审计
-- 菜单：`Tools/URP Scene Doctor/I18N Audit`
-- 输出：`Assets/_Tools/URPSceneDoctor/Reports/i18n_audit_report.txt`
-- 用途：检测 UI API 调用中的硬编码文本（建议保持 0）。
-
-## 安全说明
-- 不修改 `Packages/`、`ProjectSettings/`。
-- 所有输出保持在 `Assets/_Tools/URPSceneDoctor/**`。
+## 新手提示
+- AI 只是草稿，不会自动替你做最终结论。
+- 不配置 API Key 也能工作（离线 fallback），但 AI 生成质量会下降。
+- 保存后的 `annotation.json` 才是后续学习统计使用的最终结果。

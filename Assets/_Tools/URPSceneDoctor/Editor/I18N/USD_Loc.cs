@@ -116,7 +116,7 @@ namespace URPSceneDoctor.Editor
                 {"tuning.captureBefore",("捕获 BEFORE","Capture BEFORE")}, {"tuning.captureAfter",("捕获 AFTER","Capture AFTER")}, {"tuning.extractDelta",("提取 Delta Patch","Extract Delta Patch")},
                 {"tuning.beforePath",("BEFORE 路径","BEFORE Path")}, {"tuning.afterPath",("AFTER 路径","AFTER Path")}, {"tuning.patchPath",("Patch 路径","Patch Path")},
                 {"tuning.openSnap",("打开快照目录","Open Snapshot Folder")}, {"tuning.openPatch",("打开补丁目录","Open Patch Folder")}, {"tuning.deltaSummary",("Delta 摘要","Delta Summary")}, {"tuning.policyAlignment",("策略对齐","Policy Alignment")},
-                {"evidence.create",("生成证据包","Create Evidence Pack")}, {"evidence.cameraOverride",("手动相机覆盖","Manual Camera Override")}, {"evidence.autoCamera",("自动相机","Auto Camera")}, {"evidence.pickReason",("选择原因","Pick Reason")},
+                {"evidence.create",("生成证据包","Create Evidence Pack")}, {"evidence.created",("证据包已生成","Evidence Pack Created")}, {"evidence.sceneViewFallback",("(SceneView 回退)","(SceneView fallback)")}, {"evidence.cameraOverride",("手动相机覆盖","Manual Camera Override")}, {"evidence.autoCamera",("自动相机","Auto Camera")}, {"evidence.pickReason",("选择原因","Pick Reason")},
                 {"batch.refreshScenes",("刷新场景","Refresh Scenes")}, {"batch.openRoot",("打开批处理目录","Open Batch Root")}, {"batch.filter",("筛选","Filter")}, {"batch.selectAll",("全选","Select All")}, {"batch.clear",("清空","Clear")},
                 {"batch.lastSummary",("最近批处理摘要","Last Batch Summary")}, {"batch.summaryPath",("摘要路径","Summary Path")}, {"batch.sample",("样本","Sample")}, {"batch.noScene",("未选择场景。","No scene selected.")},
                 {"batch.done",("完成：{0}","Done: {0}")}, {"batch.quickLabel",("快速标注","Quick Labeling")}, {"batch.aiDraft",("AI 草稿：{0}","AI Draft: {0}")},
@@ -144,6 +144,24 @@ namespace URPSceneDoctor.Editor
 
                 {"common.bullet",("- {0}","- {0}")},
                 {"i18n.auditTitle",("I18N 审计","I18N Audit")}, {"i18n.auditZero",("硬编码 UI 文案：0","Hardcoded UI strings: 0")}, {"i18n.auditFound",("发现 {0} 个问题，详见 {1}","Found {0} issue(s). See {1}")},
+                {"help.ai.overview.v062",("AI 只生成草稿；确认后才会写入 annotation.json。拒绝不会删草稿，只会记录状态。","AI only generates drafts. annotation.json is written after you confirm. Reject records status and keeps draft.")},
+                {"ai.openFolder",("打开目录","Open Folder")}, {"ai.openFile",("打开文件","Open File")}, {"ai.busy",("处理中，请稍候...","Working, please wait...")},
+                {"ai.errNoCatalog",("未找到 LabelCatalog，请先在 Settings 配置。","LabelCatalog missing. Configure it in Settings first.")},
+                {"ai.currentFolder",("当前样本目录","Current Sample Folder")}, {"ai.detectedFiles",("检测到的文件","Detected Files")},
+                {"ai.draftPanel",("Draft Panel（AI 草稿）","Draft Panel (AI Draft)")}, {"ai.finalPanel",("Final Annotation（最终标注）","Final Annotation")},
+                {"ai.generate",("生成草稿","Generate")}, {"ai.regenerate",("重新生成","Regenerate")}, {"ai.discard",("丢弃草稿","Discard")},
+                {"ai.styleGoal",("风格目标","Style Goal")}, {"ai.score",("评分（1-10）","Score (1-10)")}, {"ai.issueTags",("问题标签","Issue Tags")}, {"ai.nextSteps",("下一步建议","Next Steps")}, {"ai.shortReason",("简短理由","Short Reason")}, {"ai.userNote",("用户备注","User Note")},
+                {"ai.saveAnnotation",("保存标注","Save Annotation")}, {"ai.resetToDraft",("重置为草稿","Reset to Draft")}, {"ai.clear",("清空","Clear")},
+                {"help.ai.styleGoal",("这是你希望的整体氛围方向。","Overall atmosphere direction you want.")}, {"help.ai.score",("1 很差，10 非常好。","1 means poor, 10 means excellent.")}, {"help.ai.tags",("最多选择 3-6 个关键问题。","Select up to 3-6 key issue tags.")},
+                {"help.ai.saveAnnotation",("保存到 annotation.json，供本地学习统计使用。","Save to annotation.json for local learning statistics.")},
+                {"ai.draftNotGenerated",("草稿尚未生成。","Draft has not been generated yet.")},
+                {"ai.generatedOk",("草稿已生成：{0}","Draft generated: {0}")}, {"ai.generatedWarn",("草稿已写入，但有警告：{0}\n文件：{1}","Draft saved with warning: {0}\nFile: {1}")}, {"ai.generatedDialog",("AI 草稿已生成，请在 Draft Panel 中确认或修改。","AI draft generated. Review or edit it in Draft Panel.")},
+                {"ai.rejected",("已拒绝草稿，状态已记录。","Draft rejected and status recorded.")}, {"ai.discarded",("草稿已丢弃并记录状态。","Draft discarded and status recorded.")},
+                {"ai.savedAnnotation",("已保存 annotation.json：{0}","Saved annotation.json: {0}")}, {"ai.resetToDraftDone",("已将最终标注重置为草稿内容。","Final annotation reset to draft values.")}, {"ai.cleared",("已清空最终标注表单。","Final annotation form cleared.")},
+                {"ai.summarySaved",("已生成 AI 摘要：{0}","AI summary saved: {0}")}, {"ai.summaryFailed",("AI 摘要生成失败：{0}","AI summary failed: {0}")},
+                {"ai.ruleSaved",("规则草案已保存：{0}","Rule draft saved: {0}")}, {"ai.ruleWarn",("规则草案已保存但有警告：{0}\n文件：{1}","Rule draft saved with warning: {0}\nFile: {1}")},
+                {"ai.pairwiseSaved",("成对偏好已保存：{0}","Pairwise preference saved: {0}")}, {"ai.failed",("操作失败：{0}","Operation failed: {0}")},
+                {"ai.errLlmDisabled",("LLM 未启用或 API Key 未配置。","LLM disabled or API key is missing.")},
             };
         }
     }

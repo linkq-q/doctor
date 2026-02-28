@@ -228,7 +228,7 @@ namespace URPSceneDoctor.Editor
                 var draftPath = rec.evidencePackPath + "/ai_label_draft.json";
                 if (File.Exists(draftPath))
                 {
-                    var draft = JsonUtility.FromJson<USD_AiLabelDraft>(File.ReadAllText(draftPath));
+                    var draft = USD_AiAssistModule.LoadParsedDraft(draftPath);
                     EditorGUILayout.HelpBox(USD_Loc.T("batch.aiDraft", draft != null ? draft.short_reason : USD_Loc.T("common.invalid")), MessageType.None);
                     EditorGUILayout.BeginHorizontal();
                     if (GUILayout.Button(USD_Loc.C("batch.acceptAi"), GUILayout.Width(140)) && draft != null)
