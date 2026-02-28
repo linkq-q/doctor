@@ -32,28 +32,30 @@ namespace URPSceneDoctor.Editor
         {
             var settings = USD_Settings.GetOrCreateSettings();
             var enabled = USD_LlmClient.IsEnabled(settings);
-            EditorGUILayout.HelpBox(enabled ? "LLM enabled" : "LLM disabled: configure provider + api key in Settings. Fallback templates still available.", enabled ? MessageType.Info : MessageType.Warning);
+            EditorGUILayout.HelpBox(enabled ? USD_Loc.T("ai.enabled") : USD_Loc.T("ai.disabled"), enabled ? MessageType.Info : MessageType.Warning);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.ai.overview"), MessageType.Info);
 
-            _sampleFolder = EditorGUILayout.TextField("Sample/Evidence Folder", _sampleFolder);
+            _sampleFolder = EditorGUILayout.TextField(USD_Loc.C("ai.sampleFolder"), _sampleFolder);
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Pick Folder", GUILayout.Width(120)))
+            if (GUILayout.Button(USD_Loc.C("btn.pickFolder", "help.evidence.overview"), GUILayout.Width(120)))
             {
-                var abs = EditorUtility.OpenFolderPanel("Pick Evidence Folder", Application.dataPath, "");
+                var abs = EditorUtility.OpenFolderPanel(USD_Loc.T("btn.pickFolder"), Application.dataPath, "");
                 if (!string.IsNullOrEmpty(abs)) _sampleFolder = ToAssetPath(abs);
             }
-            if (GUILayout.Button("Open", GUILayout.Width(80)) && !string.IsNullOrEmpty(_sampleFolder)) EditorUtility.RevealInFinder(_sampleFolder);
+            if (GUILayout.Button(USD_Loc.C("btn.open"), GUILayout.Width(80)) && !string.IsNullOrEmpty(_sampleFolder)) EditorUtility.RevealInFinder(_sampleFolder);
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(6);
-            if (GUILayout.Button("Draft Labeling")) RunDraftLabeling(settings, _sampleFolder);
-            if (GUILayout.Button("Explainable Summary")) RunExplainableSummary(settings, _sampleFolder);
-            if (GUILayout.Button("Rule Authoring Assist")) RunRuleDraft(settings, _sampleFolder);
+            if (GUILayout.Button(USD_Loc.C("ai.draftLabel", "help.ai.overview"))) RunDraftLabeling(settings, _sampleFolder);
+            if (GUILayout.Button(USD_Loc.C("ai.explainSummary"))) RunExplainableSummary(settings, _sampleFolder);
+            if (GUILayout.Button(USD_Loc.C("ai.ruleAssist"))) RunRuleDraft(settings, _sampleFolder);
 
             EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("Pairwise Preference", EditorStyles.boldLabel);
-            _styleA = EditorGUILayout.TextField("Style A", _styleA);
-            _styleB = EditorGUILayout.TextField("Style B", _styleB);
-            _pairChoice = GUILayout.SelectionGrid(_pairChoice, new[] { "A better", "B better", "Tie" }, 3);
+            EditorGUILayout.LabelField(USD_Loc.T("ai.pairwise"), EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.pairwise"), MessageType.Info);
+            _styleA = EditorGUILayout.TextField(USD_Loc.C("ai.styleA"), _styleA);
+            _styleB = EditorGUILayout.TextField(USD_Loc.C("ai.styleB"), _styleB);
+            _pairChoice = GUILayout.SelectionGrid(_pairChoice, new[] { USD_Loc.T("ai.aBetter"), USD_Loc.T("ai.bBetter"), USD_Loc.T("ai.tie") }, 3);
 
             var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
             foreach (var issue in catalog.issues)
@@ -64,7 +66,7 @@ namespace URPSceneDoctor.Editor
                 if (!next && on) _selectedReasonIds.Remove(issue.id);
             }
 
-            if (GUILayout.Button("Save Pairwise Preference")) SavePairwise(_sampleFolder);
+            if (GUILayout.Button(USD_Loc.C("ai.savePairwise"))) SavePairwise(_sampleFolder);
         }
 
         public USD_ModuleResult Execute(USD_RunContext context)
@@ -113,7 +115,7 @@ namespace URPSceneDoctor.Editor
 
         private void RunDraftLabeling(USD_Settings settings, string folder)
         {
-            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog("AI", msg, "OK"); return; }
+            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog(USD_Loc.T("ai.dialogTitle"), msg, USD_Loc.T("common.ok")); return; }
             var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
             var sceneName = Path.GetFileName(folder);
             var before = JsonUtility.FromJson<USD_ScanSnapshot>(SafeRead(folder + "/snapshot_before.json")) ?? new USD_ScanSnapshot();
@@ -123,7 +125,7 @@ namespace URPSceneDoctor.Editor
             var mAfter = JsonUtility.FromJson<USD_ImageMetricsFile>(SafeRead(folder + "/image_metrics_after.json")) ?? new USD_ImageMetricsFile();
             var draft = GenerateDraft(settings, folder, sceneName, catalog, before, after, patch, mBefore, mAfter);
 
-            var action = EditorUtility.DisplayDialogComplex("Draft Labeling", JsonUtility.ToJson(draft, true), "Accept", "Reject", "Edit Manually");
+            var action = EditorUtility.DisplayDialogComplex(USD_Loc.T("ai.draftLabel"), JsonUtility.ToJson(draft, true), USD_Loc.T("batch.acceptAi"), USD_Loc.T("batch.rejectAi"), USD_Loc.T("btn.open"));
             if (action == 0) ApplyDraftToTaste(folder, draft);
             if (action == 1)
             {
@@ -136,7 +138,7 @@ namespace URPSceneDoctor.Editor
 
         private void RunExplainableSummary(USD_Settings settings, string folder)
         {
-            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog("AI", msg, "OK"); return; }
+            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog(USD_Loc.T("ai.dialogTitle"), msg, USD_Loc.T("common.ok")); return; }
             if (!USD_LlmClient.IsEnabled(settings)) return;
             var report = SafeRead(folder + "/report.json");
             var diff = SafeRead(folder + "/diff.json");
@@ -154,7 +156,7 @@ namespace URPSceneDoctor.Editor
 
         private void RunRuleDraft(USD_Settings settings, string folder)
         {
-            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog("AI", msg, "OK"); return; }
+            if (!ValidateFolder(folder, out var msg)) { EditorUtility.DisplayDialog(USD_Loc.T("ai.dialogTitle"), msg, USD_Loc.T("common.ok")); return; }
             var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
             var selected = catalog.issues.Take(2).Select(x => x.id).ToList();
             var snap = SafeRead(folder + "/snapshot_after.json");
@@ -201,8 +203,8 @@ namespace URPSceneDoctor.Editor
         private static bool ValidateFolder(string folder, out string msg)
         {
             msg = string.Empty;
-            if (string.IsNullOrWhiteSpace(folder)) { msg = "Folder not set"; return false; }
-            if (!Directory.Exists(folder)) { msg = "Folder not found"; return false; }
+            if (string.IsNullOrWhiteSpace(folder)) { msg = USD_Loc.T("ai.folderNotSet"); return false; }
+            if (!Directory.Exists(folder)) { msg = USD_Loc.T("ai.folderNotFound"); return false; }
             return true;
         }
 

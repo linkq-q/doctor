@@ -58,15 +58,15 @@ namespace URPSceneDoctor.Editor
             var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Refresh Scenes", GUILayout.Width(120))) RefreshScenes(settings.batchSceneRoot);
+            if (GUILayout.Button(USD_Loc.C("batch.refreshScenes", "help.batch.overview"), GUILayout.Width(120))) RefreshScenes(settings.batchSceneRoot);
             if (GUILayout.Button(USD_Localization.T("btn.batchrun"), GUILayout.Width(120))) RunBatch(hub, catalog, settings);
-            if (GUILayout.Button("Open Batch Root", GUILayout.Width(120))) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/BatchRuns");
+            if (GUILayout.Button(USD_Loc.C("batch.openRoot"), GUILayout.Width(120))) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/BatchRuns");
             EditorGUILayout.EndHorizontal();
 
-            _filter = EditorGUILayout.TextField("Filter", _filter);
+            _filter = EditorGUILayout.TextField(USD_Loc.C("batch.filter"), _filter);
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Select All", GUILayout.Width(90))) SetAll(true);
-            if (GUILayout.Button("Clear", GUILayout.Width(90))) SetAll(false);
+            if (GUILayout.Button(USD_Loc.C("batch.selectAll"), GUILayout.Width(90))) SetAll(true);
+            if (GUILayout.Button(USD_Loc.C("batch.clear"), GUILayout.Width(90))) SetAll(false);
             EditorGUILayout.EndHorizontal();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.Height(180));
@@ -80,13 +80,13 @@ namespace URPSceneDoctor.Editor
             if (_lastSummary != null)
             {
                 EditorGUILayout.Space(8);
-                EditorGUILayout.LabelField("Last Batch Summary", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("Summary Path", _lastSummaryPath ?? "(none)");
-                var labels = _lastSummary.records.Select(r => $"{r.sceneName} [{r.status}] rating={r.userRating}").ToArray();
+                EditorGUILayout.LabelField(USD_Loc.T("batch.lastSummary"), EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(USD_Loc.T("batch.summaryPath"), _lastSummaryPath ?? USD_Loc.T("common.none"));
+                var labels = _lastSummary.records.Select(r => $"{r.sceneName} [{r.status}] {USD_Loc.T("batch.rating")}={r.userRating}").ToArray();
                 if (labels.Length > 0)
                 {
                     _selectedRecord = Mathf.Clamp(_selectedRecord, 0, labels.Length - 1);
-                    _selectedRecord = EditorGUILayout.Popup("Sample", _selectedRecord, labels);
+                    _selectedRecord = EditorGUILayout.Popup(USD_Loc.T("batch.sample"), _selectedRecord, labels);
                     DrawAnnotationEditor(catalog, _lastSummary.records[_selectedRecord]);
                 }
             }
@@ -120,7 +120,7 @@ namespace URPSceneDoctor.Editor
             var selected = _sceneSelection.Where(x => x.Value).Select(x => x.Key).ToList();
             if (selected.Count == 0)
             {
-                EditorUtility.DisplayDialog("Batch", "No scene selected.", "OK");
+                EditorUtility.DisplayDialog(USD_Loc.T("tab.batch"), USD_Loc.T("batch.noScene"), USD_Loc.T("common.ok"));
                 return;
             }
 
@@ -208,7 +208,7 @@ namespace URPSceneDoctor.Editor
             File.WriteAllText(root + "/batch_summary.csv", BuildCsv(summary));
             if (errors.Length > 0) File.WriteAllText(root + "/errors.log", errors.ToString());
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("Batch", "Done: " + root, "OK");
+            EditorUtility.DisplayDialog(USD_Loc.T("tab.batch"), USD_Loc.T("batch.done", root), USD_Loc.T("common.ok"));
         }
 
         private static USD_StyleProfileAsset ResolveStyleProfile(USD_StyleGoal goal, USD_HubWindow hub)
@@ -221,23 +221,24 @@ namespace URPSceneDoctor.Editor
         private void DrawAnnotationEditor(USD_LabelCatalogAsset catalog, USD_BatchSampleRecord rec)
         {
             EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("Quick Labeling", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(USD_Loc.T("batch.quickLabel"), EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.batch.overview"), MessageType.Info);
             if (!string.IsNullOrEmpty(rec.evidencePackPath))
             {
                 var draftPath = rec.evidencePackPath + "/ai_label_draft.json";
                 if (File.Exists(draftPath))
                 {
                     var draft = JsonUtility.FromJson<USD_AiLabelDraft>(File.ReadAllText(draftPath));
-                    EditorGUILayout.HelpBox("AI Draft: " + (draft != null ? draft.short_reason : "(invalid)"), MessageType.None);
+                    EditorGUILayout.HelpBox(USD_Loc.T("batch.aiDraft", draft != null ? draft.short_reason : USD_Loc.T("common.invalid")), MessageType.None);
                     EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Accept AI Draft", GUILayout.Width(140)) && draft != null)
+                    if (GUILayout.Button(USD_Loc.C("batch.acceptAi"), GUILayout.Width(140)) && draft != null)
                     {
                         rec.styleGoalId = draft.recommended_style_goal_id;
                         rec.userRating = draft.recommended_score_1to10;
                         rec.selectedIssues = draft.recommended_issue_tags_top3 != null ? new List<string>(draft.recommended_issue_tags_top3) : new List<string>();
                         rec.userFinalLabel = "accepted_ai";
                     }
-                    if (GUILayout.Button("Reject AI Draft", GUILayout.Width(140)))
+                    if (GUILayout.Button(USD_Loc.C("batch.rejectAi"), GUILayout.Width(140)))
                     {
                         rec.userFinalLabel = "rejected_ai";
                     }
@@ -249,11 +250,11 @@ namespace URPSceneDoctor.Editor
             if (styleNames.Length > 0)
             {
                 var idx = Mathf.Max(0, catalog.styles.FindIndex(x => x.id == rec.styleGoalId));
-                idx = EditorGUILayout.Popup("Style Goal", idx, styleNames);
+                idx = EditorGUILayout.Popup(USD_Loc.T("batch.styleGoal"), idx, styleNames);
                 rec.styleGoalId = catalog.styles[idx].id;
             }
 
-            _rating = EditorGUILayout.IntSlider("Rating", rec.userRating <= 0 ? _rating : rec.userRating, 1, 10);
+            _rating = EditorGUILayout.IntSlider(USD_Loc.T("batch.rating"), rec.userRating <= 0 ? _rating : rec.userRating, 1, 10);
             rec.userRating = _rating;
 
             foreach (var issue in catalog.issues)
@@ -264,7 +265,7 @@ namespace URPSceneDoctor.Editor
                 if (!newOn && on) rec.selectedIssues.Remove(issue.id);
             }
 
-            if (GUILayout.Button("Save Annotation"))
+            if (GUILayout.Button(USD_Loc.C("batch.saveAnnotation")))
             {
                 if (!string.IsNullOrEmpty(rec.evidencePackPath))
                 {

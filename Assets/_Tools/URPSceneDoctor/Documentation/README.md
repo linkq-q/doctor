@@ -1,61 +1,36 @@
-# URP Scene Doctor v0.6（Vision-lite + DeepSeek + AI Assist）
+# URP Scene Doctor v0.61（Full I18N + Newcomer Guide）
 
-## v0.6 新增
-1. **Vision-lite 指标**：Evidence Pack 与 Batch Sampler 会输出 `image_metrics_before.json / image_metrics_after.json / image_metrics_diff.json`。
-2. **AI Assist 模块**：
-   - Draft Labeling（`ai_label_draft.json`）
-   - Pairwise Preference（`pairwise_pref.json`）
-   - Explainable Summary（`report_summary_ai.md`）
-   - Rule Authoring Assist（`Drafts/rule_draft.json`）
-3. **DeepSeek(OpenAI-compatible) 接入**：Settings 可配置 provider/base_url/model/timeout/maxTokens/temperature。
-4. **离线降级**：未配置 key 或 Provider=Off 时，AI 功能自动回退模板，不影响 Scan/Apply/Evidence/Batch 核心流程。
+## 新增：全量双语文案系统
+- 新增 `USD_Loc` 统一入口：`T(key)` / `T(key,args)` / `C(key, tooltipKey)`。
+- 支持 Language：`Auto / 中文 / English`，设置保存到 `EditorPrefs`，切换后窗口立即刷新。
+- 文案来源优先 `LocTable_Default.asset`（自动创建到 `Assets/_Tools/URPSceneDoctor/Config/Localization/`），缺失时回退内置表。
+- 缺 key 会显示 `[[key]]` 并输出 warning，方便补齐。
 
-## DeepSeek 设置
-1. 打开 `Tools/URP Scene Doctor` -> `Settings`。
-2. 在 `LLM Provider` 区域设置：
-   - `llmProvider`: `DeepSeek` 或 `Custom(OpenAI-compatible)`
-   - `llmBaseUrl`: 默认 `https://api.deepseek.com`
-   - `llmModel`: 默认 `deepseek-chat`
-   - `api_key`: 仅存 `EditorPrefs`（不写入资产）
-3. `promptLanguage` 可选 `zh/en`。
+## 新手引导（HelpBox + Tooltip）
+以下页面已增加一句话说明与关键按钮 tooltip：
+- Settings（LLM 配置与离线降级说明）
+- Evidence Pack（Before/After 与输出目录说明）
+- Tuning（BEFORE/AFTER/Delta 的正确步骤）
+- AI Assist（AI 草稿需人工确认，不做云端自动训练）
+- Batch Sampler（批量场景运行，单场景失败不中断）
 
-## Vision-lite 指标定义（本地）
-- brightness_bucket（由 luma_mean 分桶）
-- luma_mean / luma_std
-- overexposure_ratio（luma > 0.95）
-- center_contrast_ratio（中心 ROI std / 全局 std）
-- saturation_mean（HSV.S）
-- warm_cool_balance（R-B 均值，[-1,1]）
+## 如何切换语言
+1. 打开 `Tools/URP Scene Doctor`。
+2. 在 `Settings` 页找到 `Language`。
+3. 选择 `Auto / 中文 / English`。
+4. UI 会立即刷新。
 
-## AI Assist 使用
-1. 进入 `AI Assist` 页。
-2. 指定一个 Evidence/Sample 目录（包含 snapshot/delta/metrics）。
-3. 按需点击：
-   - `Draft Labeling`
-   - `Explainable Summary`
-   - `Rule Authoring Assist`
-   - `Save Pairwise Preference`
-4. 所有 AI 输出均落盘，附 source/timestamp/error（可审计）。
+## 如何扩展文案 key
+1. 打开（或首次运行后自动生成）
+   `Assets/_Tools/URPSceneDoctor/Config/Localization/LocTable_Default.asset`。
+2. 新增 entry：`key / zh / en / note`。
+3. 在代码中使用 `USD_Loc.T("your.key")` 或 `USD_Loc.C("your.key", "tooltip.key")`。
 
-## Batch + AI
-- Batch 运行后每个样本会生成 AI draft（有 key 调模型，无 key 使用 fallback）。
-- `batch_summary.json/csv` 增加 `aiDraftStatus` / `userFinalLabel`。
-- 批处理列表支持 `Accept AI Draft` / `Reject AI Draft` 再 `Save Annotation`。
-
-## 输出目录
-- Evidence: `Assets/_Tools/URPSceneDoctor/EvidencePacks/<Scene>/<ts>/`
-- Batch: `Assets/_Tools/URPSceneDoctor/BatchRuns/<RunId>/Samples/<Scene>/<ts>/`
-- AI 典型产物：
-  - `ai_label_draft.json`
-  - `pairwise_pref.json`
-  - `report_summary_ai.md`
-  - `Drafts/rule_draft.json`
+## i18n 审计
+- 菜单：`Tools/URP Scene Doctor/I18N Audit`
+- 输出：`Assets/_Tools/URPSceneDoctor/Reports/i18n_audit_report.txt`
+- 用途：检测 UI API 调用中的硬编码文本（建议保持 0）。
 
 ## 安全说明
-- 默认不改现有资产（仅创建新 profile / 新报告输出）。
-- 不修改 `Packages/` 与 `ProjectSettings/`。
-- 所有输出均在 `Assets/_Tools/URPSceneDoctor/**`。
-
-## 已知限制
-- v0.6 不做真正视觉模型推理，仅基于本地 Vision-lite 指标 + 文本模型。
-- Rule Authoring Assist 仅生成草案，不直接改默认 RulePack。
+- 不修改 `Packages/`、`ProjectSettings/`。
+- 所有输出保持在 `Assets/_Tools/URPSceneDoctor/**`。

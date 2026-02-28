@@ -35,12 +35,12 @@ namespace URPSceneDoctor.Editor
 
         public void DrawUI(USD_HubWindow hub)
         {
-            EditorGUILayout.HelpBox("Generate shareable evidence pack: before/after shots + summary + diff.", MessageType.Info);
-            _overrideCamera = (Camera)EditorGUILayout.ObjectField("Optional Camera Override", _overrideCamera, typeof(Camera), true);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.evidence.overview"), MessageType.Info);
+            _overrideCamera = (Camera)EditorGUILayout.ObjectField(USD_Loc.C("evidence.cameraOverride"), _overrideCamera, typeof(Camera), true);
             var pick = USD_CameraPicker.PickAutoCamera();
-            EditorGUILayout.LabelField("Auto Camera:", pick.camera != null ? pick.camera.name : "(SceneView fallback)");
-            EditorGUILayout.LabelField("Pick Reason:", pick.reason);
-            if (GUILayout.Button("Create Evidence Pack"))
+            EditorGUILayout.LabelField(USD_Loc.T("evidence.autoCamera"), pick.camera != null ? pick.camera.name : USD_Loc.T("evidence.sceneViewFallback"));
+            EditorGUILayout.LabelField(USD_Loc.T("evidence.pickReason"), pick.reason);
+            if (GUILayout.Button(USD_Loc.C("evidence.create", "help.evidence.overview")))
             {
                 CreatePack(hub);
             }
@@ -101,7 +101,7 @@ namespace URPSceneDoctor.Editor
             GenerateTasteNoteTemplate(root, sceneName, patch);
 
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("Evidence Pack Created", "Output: " + root, "OK");
+            EditorUtility.DisplayDialog(USD_Loc.T("evidence.created"), USD_Loc.T("common.outputFmt", root), USD_Loc.T("common.ok"));
             return root;
         }
 

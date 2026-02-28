@@ -14,12 +14,12 @@ namespace URPSceneDoctor.Editor
             var library = USD_DeltaStatsUtil.GetOrCreateLibrary();
             EditorGUILayout.HelpBox($"Samples: {library.entries.Count} | Last Updated: {library.lastUpdated}", MessageType.Info);
 
-            if (GUILayout.Button("Add Last Tuning Result"))
+            if (GUILayout.Button(USD_Loc.C("delta.addLast")))
             {
                 AddLastTuningResult(hub, library);
             }
 
-            if (GUILayout.Button("Import Folder..."))
+            if (GUILayout.Button(USD_Loc.C("delta.importFolder")))
             {
                 var folder = EditorUtility.OpenFolderPanel("Import delta sample folder", Application.dataPath, string.Empty);
                 if (!string.IsNullOrEmpty(folder))
@@ -28,22 +28,22 @@ namespace URPSceneDoctor.Editor
                 }
             }
 
-            if (GUILayout.Button("Recompute Stats"))
+            if (GUILayout.Button(USD_Loc.C("delta.recompute")))
             {
                 _lastStats = USD_DeltaStatsUtil.RecomputeStats(library);
                 hub.SetLearningStats(_lastStats);
             }
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Open Samples Folder")) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/DeltaLibrary/Samples");
-            if (GUILayout.Button("Open Stats Folder")) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats");
+            if (GUILayout.Button(USD_Loc.C("delta.openSamples"))) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/DeltaLibrary/Samples");
+            if (GUILayout.Button(USD_Loc.C("delta.openStats"))) EditorUtility.RevealInFinder("Assets/_Tools/URPSceneDoctor/DeltaLibrary/Stats");
             EditorGUILayout.EndHorizontal();
 
             var stats = _lastStats ?? hub.CurrentLearningStats;
             if (stats != null)
             {
-                EditorGUILayout.LabelField("Top 5 Hints", EditorStyles.boldLabel);
-                foreach (var hint in stats.topHints) EditorGUILayout.LabelField("- " + hint, EditorStyles.wordWrappedLabel);
+                EditorGUILayout.LabelField(USD_Loc.T("delta.topHints"), EditorStyles.boldLabel);
+                foreach (var hint in stats.topHints) EditorGUILayout.LabelField(USD_Loc.T("common.bullet", hint), EditorStyles.wordWrappedLabel);
             }
         }
 
@@ -56,7 +56,7 @@ namespace URPSceneDoctor.Editor
         {
             if (string.IsNullOrEmpty(hub.LastBeforeSnapshotPath) || string.IsNullOrEmpty(hub.LastAfterSnapshotPath) || string.IsNullOrEmpty(hub.OptionalDeltaPatchPath))
             {
-                EditorUtility.DisplayDialog("No Tuning Result", "Capture BEFORE/AFTER and Extract Delta Patch first.", "OK");
+                EditorUtility.DisplayDialog(USD_Loc.T("delta.noTuningTitle"), USD_Loc.T("delta.noTuningMsg"), USD_Loc.T("common.ok"));
                 return;
             }
 
@@ -94,7 +94,7 @@ namespace URPSceneDoctor.Editor
             var projectPath = Application.dataPath.Replace("/Assets", string.Empty).Replace('\\', '/');
             if (!relative.StartsWith(projectPath))
             {
-                EditorUtility.DisplayDialog("Import Failed", "Folder must be inside project.", "OK");
+                EditorUtility.DisplayDialog(USD_Loc.T("delta.importFailed"), USD_Loc.T("delta.importInsideProject"), USD_Loc.T("common.ok"));
                 return;
             }
 
@@ -102,7 +102,7 @@ namespace URPSceneDoctor.Editor
             var patch = assetPath + "/deltaPatch.json";
             if (!File.Exists(patch))
             {
-                EditorUtility.DisplayDialog("Import Failed", "deltaPatch.json not found in folder.", "OK");
+                EditorUtility.DisplayDialog(USD_Loc.T("delta.importFailed"), USD_Loc.T("delta.importMissingPatch"), USD_Loc.T("common.ok"));
                 return;
             }
 

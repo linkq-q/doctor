@@ -121,14 +121,14 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.HelpBox($"URP Scene Doctor {ToolVersion} | Scene: {ActiveSceneName} | URP: {snapshot.activeURPAssetName} | Renderer: {snapshot.activeRendererDataName} | Global Volume: {snapshot.hasGlobalVolume}", MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(USD_Localization.Label("刷新头信息", "Refresh Header"), GUILayout.Width(130))) RefreshHeaderSnapshot(true);
-            if (GUILayout.Button(USD_Localization.Label("打开示例场景", "Open Demo Scene"), GUILayout.Width(150)))
+            if (GUILayout.Button(USD_Loc.C("hub.refreshHeader"), GUILayout.Width(130))) RefreshHeaderSnapshot(true);
+            if (GUILayout.Button(USD_Loc.C("hub.openDemo"), GUILayout.Width(150)))
             {
                 USD_DemoSceneUtil.OpenOrCreateDemoSceneWithPrompt();
                 RefreshHeaderSnapshot(true);
             }
 
-            if (GUILayout.Button(USD_Localization.Label("快速验证", "Quick Verify"), GUILayout.Width(150))) RunQuickVerify();
+            if (GUILayout.Button(USD_Loc.C("hub.quickVerify"), GUILayout.Width(150))) RunQuickVerify();
             EditorGUILayout.EndHorizontal();
         }
 
@@ -166,7 +166,7 @@ namespace URPSceneDoctor.Editor
             if (_lastResult != null)
             {
                 EditorGUILayout.Space(8);
-                EditorGUILayout.LabelField("Last Work Orders", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(USD_Loc.T("hub.lastWorkOrders"), EditorStyles.boldLabel);
                 foreach (var wo in _lastResult.WorkOrders)
                 {
                     EditorGUILayout.LabelField($"[{wo.id}] {wo.title} ({wo.severity}) score={wo.sortScore:0.00}");
@@ -191,8 +191,8 @@ namespace URPSceneDoctor.Editor
         private void DrawApplyOptions()
         {
             EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("Apply Options", EditorStyles.boldLabel);
-            _applyMode = (USD_ApplyMode)EditorGUILayout.EnumPopup("Apply Mode", _applyMode);
+            EditorGUILayout.LabelField(USD_Loc.T("hub.applyOptions"), EditorStyles.boldLabel);
+            _applyMode = (USD_ApplyMode)EditorGUILayout.EnumPopup(USD_Loc.C("hub.applyMode"), _applyMode);
 
             var names = new string[_styleProfiles.Length];
             for (var i = 0; i < _styleProfiles.Length; i++)
@@ -200,8 +200,8 @@ namespace URPSceneDoctor.Editor
                 names[i] = _styleProfiles[i] != null ? _styleProfiles[i].profileName : "(missing)";
             }
 
-            _selectedStyleIndex = _styleProfiles.Length == 0 ? 0 : Mathf.Clamp(EditorGUILayout.Popup("Style Profile", _selectedStyleIndex, names), 0, _styleProfiles.Length - 1);
-            _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft("Assign new profile to existing Global Volume (default OFF)", _assignNewProfileToExistingGlobalVolume);
+            _selectedStyleIndex = _styleProfiles.Length == 0 ? 0 : Mathf.Clamp(EditorGUILayout.Popup(USD_Loc.T("hub.styleProfile"), _selectedStyleIndex, names), 0, _styleProfiles.Length - 1);
+            _assignNewProfileToExistingGlobalVolume = EditorGUILayout.ToggleLeft(USD_Loc.T("hub.bindPolicy"), _assignNewProfileToExistingGlobalVolume);
         }
 
         private void RunModule(IToolModule module, USD_RunMode mode, bool saveSnapshot)
@@ -304,7 +304,7 @@ namespace URPSceneDoctor.Editor
             if (_lastResult == null) return;
             var sceneName = string.IsNullOrWhiteSpace(ActiveSceneName) ? "UntitledScene" : ActiveSceneName;
             LastReportPath = WriteReport(_lastResult, USD_EditorUtil.Timestamp, sceneName);
-            ShowNotification(new GUIContent("Report exported"));
+            ShowNotification(new GUIContent(USD_Loc.T("hub.reportExported")));
         }
 
         private void RunQuickVerify()
@@ -312,7 +312,7 @@ namespace URPSceneDoctor.Editor
             RunModule(_atmosModule, USD_RunMode.Scan, true);
             var hitCount = _lastResult != null ? _lastResult.WorkOrders.Count : 0;
             var warningCount = _lastResult != null ? _lastResult.Warnings.Count : 0;
-            EditorUtility.DisplayDialog("Quick Verify Complete", $"Report Path: {LastReportPath}\nMatched Rules: {hitCount}\nWarnings: {warningCount}", "OK");
+            EditorUtility.DisplayDialog(USD_Loc.T("quickverify.title"), $"{USD_Loc.T("quickverify.reportPath")}: {LastReportPath}\n{USD_Loc.T("quickverify.matched")}: {hitCount}\n{USD_Loc.T("quickverify.warnings")}: {warningCount}", USD_Loc.T("common.ok"));
         }
 
         public void SetLearningStats(USD_DeltaStats stats)
@@ -327,12 +327,13 @@ namespace URPSceneDoctor.Editor
 
         private static void DrawReports()
         {
-            EditorGUILayout.HelpBox("Reports are generated under Assets/_Tools/URPSceneDoctor/Reports/{SceneName}", MessageType.Info);
+            EditorGUILayout.HelpBox(USD_Loc.T("reports.hint"), MessageType.Info);
         }
 
         private void DrawSettings()
         {
             var settings = USD_Settings.GetOrCreateSettings();
+            EditorGUILayout.HelpBox(USD_Loc.T("help.settings.overview"), MessageType.Info);
             var so = new SerializedObject(settings);
             so.Update();
             EditorGUILayout.PropertyField(so.FindProperty("reportsRoot"));
@@ -346,29 +347,42 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("screenshotHeight"));
             EditorGUILayout.PropertyField(so.FindProperty("cameraMode"));
             EditorGUILayout.PropertyField(so.FindProperty("manualCamera"));
-            EditorGUILayout.PropertyField(so.FindProperty("language"));
-            EditorGUILayout.PropertyField(so.FindProperty("promptLanguage"));
+            var langOptions = new[] { "Auto", "中文", "English" };
+            var currentMode = USD_Loc.GetLanguageMode();
+            var modeIdx = Mathf.Max(0, System.Array.IndexOf(langOptions, currentMode));
+            var newIdx = EditorGUILayout.Popup(USD_Loc.T("settings.language"), modeIdx, new[] { USD_Loc.T("lang.auto"), USD_Loc.T("lang.zh"), USD_Loc.T("lang.en") });
+            if (newIdx != modeIdx)
+            {
+                USD_Loc.SetLanguageMode(langOptions[newIdx]);
+                settings.language = langOptions[newIdx];
+            }
+
+            var promptLang = so.FindProperty("promptLanguage");
+            var promptIdx = promptLang.stringValue == "en" ? 1 : 0;
+            var promptNewIdx = EditorGUILayout.Popup(USD_Loc.T("settings.promptLang"), promptIdx, new[] { "中文", "English" });
+            promptLang.stringValue = promptNewIdx == 1 ? "en" : "zh";
             EditorGUILayout.PropertyField(so.FindProperty("enableLearningHints"));
             EditorGUILayout.PropertyField(so.FindProperty("policyBrightnessBucket"));
             EditorGUILayout.PropertyField(so.FindProperty("labelCatalog"));
             EditorGUILayout.PropertyField(so.FindProperty("defaultTastePolicy"));
             EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("LLM Provider", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(so.FindProperty("llmProvider"));
-            EditorGUILayout.PropertyField(so.FindProperty("llmBaseUrl"));
-            EditorGUILayout.PropertyField(so.FindProperty("llmModel"));
-            EditorGUILayout.PropertyField(so.FindProperty("llmTimeoutSec"));
-            EditorGUILayout.PropertyField(so.FindProperty("llmMaxTokens"));
-            EditorGUILayout.PropertyField(so.FindProperty("llmTemperature"));
+            EditorGUILayout.LabelField(USD_Loc.T("settings.llmProvider"), EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.settings.llm"), MessageType.Info);
+            EditorGUILayout.PropertyField(so.FindProperty("llmProvider"), USD_Loc.C("settings.llmProvider"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmBaseUrl"), USD_Loc.C("settings.llmBaseUrl"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmModel"), USD_Loc.C("settings.llmModel"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmTimeoutSec"), USD_Loc.C("settings.llmTimeout"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmMaxTokens"), USD_Loc.C("settings.llmMaxTokens"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmTemperature"), USD_Loc.C("settings.llmTemp"));
             var apiKey = USD_LlmClient.GetApiKey();
-            var newApiKey = EditorGUILayout.PasswordField("api_key", apiKey);
+            var newApiKey = EditorGUILayout.PasswordField(USD_Loc.T("settings.apiKey"), apiKey);
             if (newApiKey != apiKey) USD_LlmClient.SetApiKey(newApiKey);
             so.ApplyModifiedProperties();
 
             if (settings.labelCatalog == null) settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
             if (settings.labelCatalog != null && USD_LabelCatalogUtil.HasDuplicateIds(settings.labelCatalog, out var dup))
             {
-                EditorGUILayout.HelpBox("Duplicate id in label catalog: " + dup, MessageType.Warning);
+                EditorGUILayout.HelpBox(USD_Loc.T("settings.dupLabelId", dup), MessageType.Warning);
             }
 
             _activeTastePolicy = settings.defaultTastePolicy != null ? settings.defaultTastePolicy : _activeTastePolicy;

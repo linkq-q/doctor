@@ -9,7 +9,7 @@ namespace URPSceneDoctor.Editor
 
         public void DrawUI(USD_HubWindow hub)
         {
-            EditorGUILayout.LabelField("Lightweight render performance advisory checks.", EditorStyles.wordWrappedLabel);
+            EditorGUILayout.HelpBox(USD_Loc.T("help.render.overview"), MessageType.Info);
             hub.DrawExecutionButtons(this);
         }
 

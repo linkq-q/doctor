@@ -9,9 +9,9 @@ namespace URPSceneDoctor.Editor
 
         public void DrawUI(USD_HubWindow hub)
         {
-            EditorGUILayout.LabelField("Atmosphere-first audit based on project evidence.", EditorStyles.wordWrappedLabel);
-            EditorGUILayout.LabelField("Taste Policy:", hub.ActiveTastePolicy != null ? hub.ActiveTastePolicy.policyName : "(none)");
-            if (GUILayout.Button("Create Evidence Pack"))
+            EditorGUILayout.HelpBox(USD_Loc.T("help.atmos.overview"), MessageType.Info);
+            EditorGUILayout.LabelField(USD_Loc.T("atmos.tastePolicy"), hub.ActiveTastePolicy != null ? hub.ActiveTastePolicy.policyName : USD_Loc.T("common.none"));
+            if (GUILayout.Button(USD_Loc.C("atmos.createEvidence", "help.evidence.overview")))
             {
                 hub.CreateEvidencePack();
             }

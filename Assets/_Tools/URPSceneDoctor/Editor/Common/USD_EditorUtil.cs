@@ -130,6 +130,7 @@ namespace URPSceneDoctor.Editor
                     settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
                     EditorUtility.SetDirty(settings);
                 }
+                settings.language = USD_Loc.GetLanguageMode();
                 AssetDatabase.SaveAssets();
                 return settings;
             }
@@ -138,6 +139,7 @@ namespace URPSceneDoctor.Editor
             settings = CreateInstance<USD_Settings>();
             settings.defaultTastePolicy = USD_TastePolicyUtil.GetOrCreateDefaultPolicy();
             settings.labelCatalog = USD_LabelCatalogUtil.GetOrCreateDefault();
+            settings.language = USD_Loc.GetLanguageMode();
             AssetDatabase.CreateAsset(settings, settingsPath);
             AssetDatabase.SaveAssets();
             return settings;

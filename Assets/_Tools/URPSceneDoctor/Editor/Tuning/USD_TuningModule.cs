@@ -15,15 +15,15 @@ namespace URPSceneDoctor.Editor
 
         public void DrawUI(USD_HubWindow hub)
         {
-            EditorGUILayout.HelpBox("Capture manual tuning before/after and extract a delta patch.", MessageType.Info);
-            if (GUILayout.Button("Capture BEFORE"))
+            EditorGUILayout.HelpBox(USD_Loc.T("help.tuning.overview"), MessageType.Info);
+            if (GUILayout.Button(USD_Loc.C("tuning.captureBefore", "help.tuning.overview")))
             {
                 var snap = USD_AtmosScanner.CaptureSnapshot();
                 var ts = USD_EditorUtil.Timestamp;
                 BeforeSnapshotPath = USD_SnapshotUtil.SaveSnapshot(hub.ActiveSceneName, ts, snap);
             }
 
-            if (GUILayout.Button("Capture AFTER"))
+            if (GUILayout.Button(USD_Loc.C("tuning.captureAfter", "help.tuning.overview")))
             {
                 var snap = USD_AtmosScanner.CaptureSnapshot();
                 var ts = USD_EditorUtil.Timestamp;
@@ -32,7 +32,7 @@ namespace URPSceneDoctor.Editor
 
             using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(BeforeSnapshotPath) || string.IsNullOrEmpty(AfterSnapshotPath)))
             {
-                if (GUILayout.Button("Extract Delta Patch"))
+                if (GUILayout.Button(USD_Loc.C("tuning.extractDelta", "help.tuning.overview")))
                 {
                     var patch = USD_DeltaExtractor.Extract(hub.ActiveSceneName, BeforeSnapshotPath, AfterSnapshotPath);
                     if (patch != null)
@@ -49,24 +49,24 @@ namespace URPSceneDoctor.Editor
             }
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Open Snapshot Folder"))
+            if (GUILayout.Button(USD_Loc.C("tuning.openSnap")))
             {
                 var folder = USD_EditorUtil.EnsureSceneSubFolder("Snapshots", hub.ActiveSceneName);
                 EditorUtility.RevealInFinder(folder);
             }
 
-            if (GUILayout.Button("Open Patch Folder"))
+            if (GUILayout.Button(USD_Loc.C("tuning.openPatch")))
             {
                 var folder = USD_EditorUtil.EnsureSceneSubFolder("Patches", hub.ActiveSceneName);
                 EditorUtility.RevealInFinder(folder);
             }
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.LabelField("Before Snapshot:", BeforeSnapshotPath ?? "(none)");
-            EditorGUILayout.LabelField("After Snapshot:", AfterSnapshotPath ?? "(none)");
-            EditorGUILayout.LabelField("Delta Patch:", LastDeltaPatchPath ?? "(none)");
-            EditorGUILayout.LabelField("Delta Summary:", $"changed fields = {LastChangedFieldsCount}");
-            EditorGUILayout.LabelField("Policy Alignment:", string.IsNullOrEmpty(LastPolicyAlignment) ? "(not evaluated)" : LastPolicyAlignment);
+            EditorGUILayout.LabelField(USD_Loc.T("tuning.beforePath"), BeforeSnapshotPath ?? USD_Loc.T("common.none"));
+            EditorGUILayout.LabelField(USD_Loc.T("tuning.afterPath"), AfterSnapshotPath ?? USD_Loc.T("common.none"));
+            EditorGUILayout.LabelField(USD_Loc.T("tuning.patchPath"), LastDeltaPatchPath ?? USD_Loc.T("common.none"));
+            EditorGUILayout.LabelField(USD_Loc.T("tuning.deltaSummary"), USD_Loc.T("tuning.changedFmt", LastChangedFieldsCount));
+            EditorGUILayout.LabelField(USD_Loc.T("tuning.policyAlignment"), string.IsNullOrEmpty(LastPolicyAlignment) ? USD_Loc.T("common.notEvaluated") : LastPolicyAlignment);
         }
 
         public USD_ModuleResult Execute(USD_RunContext context)

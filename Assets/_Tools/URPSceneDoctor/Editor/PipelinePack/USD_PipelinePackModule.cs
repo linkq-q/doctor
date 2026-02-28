@@ -14,17 +14,17 @@ namespace URPSceneDoctor.Editor
 
         public void DrawUI(USD_HubWindow hub)
         {
-            EditorGUILayout.HelpBox("Base Pack v1: Distance Fog + Volumetric Light (safe install/uninstall with preflight).", MessageType.Info);
-            EditorGUILayout.LabelField("Pack", "Base Pack v1");
+            EditorGUILayout.HelpBox(USD_Loc.T("pipeline.overview"), MessageType.Info);
+            EditorGUILayout.LabelField(USD_Loc.T("pipeline.pack"), "Base Pack v1");
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Preflight"))
+            if (GUILayout.Button(USD_Loc.C("pipeline.preflight")))
             {
                 _lastPreflight = USD_PipelinePackUtil.RunPreflight();
                 WritePreflightReport(hub, _lastPreflight);
             }
 
-            if (GUILayout.Button("Install"))
+            if (GUILayout.Button(USD_Loc.C("pipeline.install")))
             {
                 var ts = USD_EditorUtil.Timestamp;
                 var sceneName = string.IsNullOrWhiteSpace(hub.ActiveSceneName) ? "UntitledScene" : hub.ActiveSceneName;
@@ -32,7 +32,7 @@ namespace URPSceneDoctor.Editor
                 WriteActionReport(sceneName, ts, "Install", changes);
             }
 
-            if (GUILayout.Button("Uninstall"))
+            if (GUILayout.Button(USD_Loc.C("pipeline.uninstall")))
             {
                 var ts = USD_EditorUtil.Timestamp;
                 var sceneName = string.IsNullOrWhiteSpace(hub.ActiveSceneName) ? "UntitledScene" : hub.ActiveSceneName;
@@ -40,7 +40,7 @@ namespace URPSceneDoctor.Editor
                 WriteActionReport(sceneName, ts, "Uninstall", changes);
             }
 
-            if (GUILayout.Button("Evidence Pack"))
+            if (GUILayout.Button(USD_Loc.C("pipeline.evidence")))
             {
                 CreatePipelineEvidencePack(hub);
             }
@@ -152,7 +152,7 @@ namespace URPSceneDoctor.Editor
             File.WriteAllText(root + "/summary.md", summary.ToString());
 
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("Pipeline Pack Evidence", "Output: " + root, "OK");
+            EditorUtility.DisplayDialog(USD_Loc.T("pipeline.evidence"), USD_Loc.T("common.outputFmt", root), USD_Loc.T("common.ok"));
         }
     }
 }
