@@ -23,8 +23,12 @@ namespace URPSceneDoctor.Editor
                       "\nllmBaseUrl=" + settings.llmBaseUrl +
                       "\nllmModel=" + settings.llmModel +
                       "\nllmTimeoutSec=" + settings.llmTimeoutSec +
+                      "\nsingleCallTimeoutSec=" + settings.singleCallTimeoutSec +
                       "\nllmMaxTokens=" + settings.llmMaxTokens +
                       "\nllmTemperature=" + settings.llmTemperature +
+                      "\nshowAiSendAndReceiveToast=" + settings.showAiSendAndReceiveToast +
+                      "\ndumpRawResponseToFile=" + settings.dumpRawResponseToFile +
+                      "\nrawResponseDumpPath=" + settings.rawResponseDumpPath +
                       "\nsmhMaxOffset=" + settings.smhMaxOffset);
 
             EditorGUIUtility.PingObject(settings);

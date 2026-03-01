@@ -381,8 +381,12 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.PropertyField(so.FindProperty("llmBaseUrl"), USD_Loc.C("settings.llmBaseUrl"));
             EditorGUILayout.PropertyField(so.FindProperty("llmModel"), USD_Loc.C("settings.llmModel"));
             EditorGUILayout.PropertyField(so.FindProperty("llmTimeoutSec"), USD_Loc.C("settings.llmTimeout"));
+            EditorGUILayout.PropertyField(so.FindProperty("singleCallTimeoutSec"), USD_Loc.C("settings.singleCallTimeout"));
             EditorGUILayout.PropertyField(so.FindProperty("llmMaxTokens"), USD_Loc.C("settings.llmMaxTokens"));
             EditorGUILayout.PropertyField(so.FindProperty("llmTemperature"), USD_Loc.C("settings.llmTemp"));
+            EditorGUILayout.PropertyField(so.FindProperty("showAiSendAndReceiveToast"), USD_Loc.C("settings.showAiSendAndReceiveToast"));
+            EditorGUILayout.PropertyField(so.FindProperty("dumpRawResponseToFile"), USD_Loc.C("settings.dumpRawResponseToFile"));
+            EditorGUILayout.PropertyField(so.FindProperty("rawResponseDumpPath"), USD_Loc.C("settings.rawResponseDumpPath"));
             EditorGUILayout.PropertyField(so.FindProperty("smhMaxOffset"), USD_Loc.C("settings.smhMaxOffset"));
             var apiKey = USD_LlmClient.GetApiKey();
             var newApiKey = EditorGUILayout.PasswordField(USD_Loc.T("settings.apiKey"), apiKey);

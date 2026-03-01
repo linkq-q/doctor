@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -28,6 +30,10 @@ namespace URPSceneDoctor.Editor
         public string text;
         public string raw_json;
         public string error;
+        public long statusCode;
+        public long latencyMs;
+        public bool timedOut;
+        public int responseSize;
     }
 
     public static class USD_LlmClient
@@ -66,6 +72,13 @@ namespace URPSceneDoctor.Editor
                 var url = baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
                     ? baseUrl
                     : baseUrl + "/chat/completions";
+                var requestTimeoutSec = Mathf.Max(3, settings.llmTimeoutSec);
+                var singleCallTimeoutSec = Mathf.Max(requestTimeoutSec, settings.singleCallTimeoutSec);
+
+                if (settings.verboseLogs)
+                {
+                    UnityEngine.Debug.Log($"[USD][LLM] Sending request: provider={settings.llmProvider}, model={req.model}, url={url}, timeout={requestTimeoutSec}s, singleCallTimeout={singleCallTimeoutSec}s, payloadBytes={Encoding.UTF8.GetByteCount(json)}");
+                }
 
                 using (var uwr = new UnityWebRequest(url, "POST"))
                 {
@@ -74,22 +87,68 @@ namespace URPSceneDoctor.Editor
                     uwr.downloadHandler = new DownloadHandlerBuffer();
                     uwr.SetRequestHeader("Content-Type", "application/json");
                     uwr.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
-                    uwr.timeout = Mathf.Max(3, settings.llmTimeoutSec);
+                    uwr.timeout = requestTimeoutSec;
 
+                    var watch = Stopwatch.StartNew();
                     var op = uwr.SendWebRequest();
-                    while (!op.isDone) { }
+                    var completion = new ManualResetEventSlim(false);
+                    try
+                    {
+                        op.completed += _ => completion.Set();
+                        var completedInTime = completion.Wait(TimeSpan.FromSeconds(singleCallTimeoutSec));
+                        watch.Stop();
+
+                        if (!completedInTime)
+                        {
+                            uwr.Abort();
+                            return new USD_LlmResult
+                            {
+                                success = false,
+                                error = $"SingleCallTimeout after {singleCallTimeoutSec}s",
+                                timedOut = true,
+                                latencyMs = watch.ElapsedMilliseconds
+                            };
+                        }
+                    }
+                    finally
+                    {
+                        completion.Dispose();
+                    }
+
 
                     var raw = uwr.downloadHandler != null ? uwr.downloadHandler.text : string.Empty;
+                    var statusCode = uwr.responseCode;
+                    if (settings.verboseLogs)
+                    {
+                        UnityEngine.Debug.Log($"[USD][LLM] Response: status={statusCode}, result={uwr.result}, latencyMs={watch.ElapsedMilliseconds}, bytes={(raw ?? string.Empty).Length}");
+                    }
                     if (uwr.result != UnityWebRequest.Result.Success)
                     {
-                        return new USD_LlmResult { success = false, error = uwr.error, raw_json = raw };
+                        return new USD_LlmResult
+                        {
+                            success = false,
+                            error = $"HTTP {(int)statusCode}: {uwr.error}",
+                            raw_json = raw,
+                            statusCode = statusCode,
+                            latencyMs = watch.ElapsedMilliseconds,
+                            responseSize = (raw ?? string.Empty).Length
+                        };
                     }
 
                     var parsed = JsonUtility.FromJson<USD_LlmResponse>(raw);
                     var text = parsed != null && parsed.choices != null && parsed.choices.Count > 0 && parsed.choices[0].message != null
                         ? parsed.choices[0].message.content
                         : string.Empty;
-                    return new USD_LlmResult { success = !string.IsNullOrWhiteSpace(text), text = text, raw_json = raw, error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty };
+                    return new USD_LlmResult
+                    {
+                        success = !string.IsNullOrWhiteSpace(text),
+                        text = text,
+                        raw_json = raw,
+                        error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty,
+                        statusCode = statusCode,
+                        latencyMs = watch.ElapsedMilliseconds,
+                        responseSize = (raw ?? string.Empty).Length
+                    };
                 }
             }
             catch (Exception e)

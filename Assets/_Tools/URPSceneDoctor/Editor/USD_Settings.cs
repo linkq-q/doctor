@@ -42,8 +42,12 @@ namespace URPSceneDoctor.Editor
         public string llmBaseUrl = "https://api.deepseek.com/v1";
         public string llmModel = "deepseek-chat";
         public int llmTimeoutSec = 30;
+        public int singleCallTimeoutSec = 60;
         public int llmMaxTokens = 600;
         public float llmTemperature = 0.2f;
+        public bool showAiSendAndReceiveToast = true;
+        public bool dumpRawResponseToFile = true;
+        public string rawResponseDumpPath = "Assets/_Tools/URPSceneDoctor/AITuningRuns/{runId}/raw/llm_response.txt";
 
         [Header("SMH")]
         public float smhMaxOffset = 0.1f;

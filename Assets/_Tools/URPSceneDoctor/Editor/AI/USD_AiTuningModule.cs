@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -58,6 +59,7 @@ namespace URPSceneDoctor.Editor
         private MessageType _statusType = MessageType.Info;
         private int _targetStyleIndex, _pairwiseChoice;
         private bool _useMetricsGoal = true;
+        private bool _isProposing;
         private float _goalOverExposure = 0.01f, _goalCenterContrast = 1.1f, _bloomCeiling = 5f;
         private USD_ImageMetricsFile _baseMetrics;
         private USD_ScanSnapshot _baseSnapshot;
@@ -85,7 +87,10 @@ namespace URPSceneDoctor.Editor
 
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button(USD_Loc.C("aituning.captureBase"))) CaptureBase(hub);
-            if (GUILayout.Button(USD_Loc.C("aituning.propose"))) Propose(settings, catalog);
+            using (new EditorGUI.DisabledScope(_isProposing))
+            {
+                if (GUILayout.Button(USD_Loc.C("aituning.propose"))) GenerateProposalSingleCall(settings, catalog);
+            }
             if (GUILayout.Button(USD_Loc.C("aituning.runBoth"))) { RunVariant(hub, _variantA); RunVariant(hub, _variantB); CheckVisualDifference(); }
             EditorGUILayout.EndHorizontal();
 
@@ -114,78 +119,104 @@ namespace URPSceneDoctor.Editor
             catch (Exception e) { SetStatus(MessageType.Error, "Capture Base failed: " + e.Message); }
         }
 
-        private void Propose(USD_Settings settings, USD_LabelCatalogAsset catalog)
+        private void GenerateProposalSingleCall(USD_Settings settings, USD_LabelCatalogAsset catalog)
         {
             if (_baseSnapshot == null || _baseMetrics == null) { SetStatus(MessageType.Warning, USD_Loc.T("aituning.needBase")); return; }
+            if (settings == null) { _llmStatus.MarkFail("设置读取失败：USD_Settings 为空。"); SetStatus(MessageType.Error, "Settings load failed: USD_Settings is null."); return; }
+
+            _isProposing = true;
             var styleId = catalog.styles[Mathf.Clamp(_targetStyleIndex,0,catalog.styles.Count-1)].id;
             _proposal = BuildFallbackProposal(styleId, _baseMetrics.aggregate);
-            if (USD_LlmClient.IsEnabled(settings))
+            var watch = Stopwatch.StartNew();
+
+            try
             {
-                _llmStatus.MarkSending("已发送请求（AI Tuning）...");
-                _llmStatus.MarkWaiting("正在等待 AI 回复...");
-                var res = USD_LlmClient.Chat(settings, BuildSystemPrompt(), BuildProposalPrompt(styleId));
-                if (res.success)
+                if (USD_LlmClient.IsEnabled(settings))
                 {
-                    var parsed = TryParseProposal(res.text);
-                    if (parsed != null)
+                    if (settings.showAiSendAndReceiveToast)
                     {
-                        _proposal = parsed;
-                        _llmStatus.MarkSuccess("AI 回复成功：已生成 A/B 方案。");
+                        _llmStatus.MarkSending("[Send] AI请求已发送（AI Tuning）...");
+                    }
+
+                    UnityEngine.Debug.Log($"[USD][AITuning] LLM request sent (runId={Path.GetFileName(_runRoot)}, model={settings.llmModel})");
+                    var res = USD_LlmClient.Chat(settings, BuildSystemPrompt(), BuildProposalPrompt(styleId));
+                    if (settings.dumpRawResponseToFile)
+                    {
+                        DumpRawResponse(settings, res.raw_json);
+                    }
+
+                    if (res.success)
+                    {
+                        var parsed = TryParseProposal(res.text);
+                        if (parsed != null)
+                        {
+                            _proposal = parsed;
+                            watch.Stop();
+                            _llmStatus.MarkSuccess($"[OK] AI回复成功（{watch.Elapsed.TotalSeconds:0.00}s）");
+                            UnityEngine.Debug.Log($"[USD][AITuning] LLM response OK (status={res.statusCode}, ms={res.latencyMs})");
+                        }
+                        else
+                        {
+                            _proposal.warnings.Add("ParseFailed: unexpected JSON schema");
+                            _llmStatus.MarkFail("[Fail] JSON解析失败，已使用兜底方案。");
+                        }
                     }
                     else
                     {
-                        _proposal.warnings.Add("ParseFailed: fallback used");
-                        _llmStatus.MarkFail("返回解析失败，已使用兜底方案。");
+                        var err = string.IsNullOrEmpty(res.error) ? "未知错误" : res.error;
+                        _proposal.warnings.Add("LLMFailed:" + err);
+                        if (res.timedOut)
+                        {
+                            _proposal.warnings.Add($"TimeoutExit: llmTimeoutSec={settings.llmTimeoutSec}, singleCallTimeoutSec={settings.singleCallTimeoutSec}");
+                        }
+
+                        _llmStatus.MarkFail($"[Fail] AI调用失败：{err}");
+                        UnityEngine.Debug.LogError($"[USD][AITuning] LLM response FAIL (status={res.statusCode}, ms={res.latencyMs}, timedOut={res.timedOut}) error={err}");
                     }
                 }
                 else
                 {
-                    _proposal.warnings.Add("LLMFailed:" + res.error);
-                    _llmStatus.MarkFail(string.IsNullOrEmpty(res.error) ? "未知错误" : res.error);
+                    _proposal.warnings.Add("LLMDisabled: fallback used");
+                    _llmStatus.MarkFail("[Fail] LLM 未启用，已使用兜底方案。");
                 }
+
+                NormalizeByPolicy(_proposal.variantA, _baseMetrics.aggregate); NormalizeByPolicy(_proposal.variantB, _baseMetrics.aggregate);
+                var force = EnforceForceDiversity();
+                _forceStatus = force;
+                _proposal.forceDiversityStatus = force;
+                _variantA.Params.FromMap(_proposal.variantA.@params.ToMap()); _variantA.CurvePreset = _proposal.variantA.curve_preset; _variantA.Smh = _proposal.variantA.smh_hint;
+                _variantB.Params.FromMap(_proposal.variantB.@params.ToMap()); _variantB.CurvePreset = _proposal.variantB.curve_preset; _variantB.Smh = _proposal.variantB.smh_hint;
+
+                var proposalDir = _runRoot + "/proposal"; USD_EditorUtil.EnsureFolder(proposalDir);
+                File.WriteAllText(proposalDir + "/ai_param_proposal.json", ToProposalJson(_proposal)); AssetDatabase.Refresh();
+                SetStatus(MessageType.Info, "Proposal generated: " + proposalDir + "/ai_param_proposal.json");
             }
-
-            NormalizeByPolicy(_proposal.variantA, _baseMetrics.aggregate); NormalizeByPolicy(_proposal.variantB, _baseMetrics.aggregate);
-            var force = EnforceForceDiversity(settings, styleId);
-            _forceStatus = force;
-            _proposal.forceDiversityStatus = force;
-            _variantA.Params.FromMap(_proposal.variantA.@params.ToMap()); _variantA.CurvePreset = _proposal.variantA.curve_preset; _variantA.Smh = _proposal.variantA.smh_hint;
-            _variantB.Params.FromMap(_proposal.variantB.@params.ToMap()); _variantB.CurvePreset = _proposal.variantB.curve_preset; _variantB.Smh = _proposal.variantB.smh_hint;
-
-            var proposalDir = _runRoot + "/proposal"; USD_EditorUtil.EnsureFolder(proposalDir);
-            File.WriteAllText(proposalDir + "/ai_param_proposal.json", ToProposalJson(_proposal)); AssetDatabase.Refresh();
-            SetStatus(MessageType.Info, "Proposal generated: " + proposalDir + "/ai_param_proposal.json");
+            finally
+            {
+                _isProposing = false;
+            }
         }
 
-        private string EnforceForceDiversity(USD_Settings settings, string styleId)
+        private void DumpRawResponse(USD_Settings settings, string rawResponse)
+        {
+            var runId = Path.GetFileName(_runRoot);
+            var template = string.IsNullOrWhiteSpace(settings.rawResponseDumpPath)
+                ? "Assets/_Tools/URPSceneDoctor/AITuningRuns/{runId}/raw/llm_response.txt"
+                : settings.rawResponseDumpPath;
+            var outputPath = template.Replace("{runId}", runId).Replace('\\', '/');
+            var dir = Path.GetDirectoryName(outputPath)?.Replace('\\', '/');
+            if (!string.IsNullOrEmpty(dir))
+            {
+                USD_EditorUtil.EnsureFolder(dir);
+            }
+
+            File.WriteAllText(outputPath, rawResponse ?? string.Empty);
+            AssetDatabase.Refresh();
+        }
+
+        private string EnforceForceDiversity()
         {
             if (DiversityOk(_proposal.variantA.@params, _proposal.variantB.@params)) return "OK";
-            if (USD_LlmClient.IsEnabled(settings))
-            {
-                var oldTemp = settings.llmTemperature; settings.llmTemperature = 0.8f;
-                _llmStatus.MarkSending("已发送重试请求（Force Diversity）...");
-                _llmStatus.MarkWaiting("正在等待重试回复...");
-                var retry = USD_LlmClient.Chat(settings, BuildSystemPrompt(), BuildProposalPrompt(styleId));
-                settings.llmTemperature = oldTemp;
-                if (retry.success)
-                {
-                    var parsed = TryParseProposal(retry.text);
-                    if (parsed != null)
-                    {
-                        _proposal.variantA = parsed.variantA; _proposal.variantB = parsed.variantB; _proposal.notes.AddRange(parsed.notes);
-                        NormalizeByPolicy(_proposal.variantA, _baseMetrics.aggregate); NormalizeByPolicy(_proposal.variantB, _baseMetrics.aggregate);
-                        if (DiversityOk(_proposal.variantA.@params, _proposal.variantB.@params))
-                        {
-                            _llmStatus.MarkSuccess("Force Diversity 重试成功。");
-                            return "OK";
-                        }
-                    }
-                }
-                else
-                {
-                    _llmStatus.MarkFail(string.IsNullOrEmpty(retry.error) ? "重试失败" : retry.error);
-                }
-            }
 
             var map = _proposal.variantB.@params.ToMap();
             map["WB.temperature"] = Mathf.Clamp(map["WB.temperature"] + (_contrastPairHint == "warm" ? 8f : -8f), -20f, 20f);
@@ -336,7 +367,7 @@ namespace URPSceneDoctor.Editor
             v.smh_hint.shadowsBias = Mathf.Clamp(v.smh_hint.shadowsBias, -0.1f, 0.1f); v.smh_hint.highlightsBias = Mathf.Clamp(v.smh_hint.highlightsBias, -0.1f, 0.1f);
         }
 
-        private string BuildSystemPrompt() => "你是URP 场景氛围调参助手。严格输出 JSON。只能输出白名单字段。必须输出A=保守干净、B=大胆氛围；暗角0.2/0.2、grain thin1+0.6、bloom scatter 0.5，低对比优先曲线/SMH。";
+        private string BuildSystemPrompt() => "你是URP场景氛围调参助手。必须只输出严格JSON，不要markdown。输出字段固定为 variantA/variantB/notes/forceDiversityStatus/warnings；每个variant必须包含params、curve_preset、smh_hint、rationale。必须输出A=保守干净、B=大胆氛围；暗角0.2/0.2、grain thin1+0.6、bloom scatter 0.5，低对比优先曲线/SMH。";
 
         private string BuildProposalPrompt(string styleId)
         {
@@ -432,7 +463,7 @@ namespace URPSceneDoctor.Editor
         }
 
         private static string GetStyleDisplay(USD_StyleGoal x) => USD_Loc.CurrentLang() == "zh" ? $"{x.name_zh} ({x.id})" : $"{x.name_en} ({x.id})";
-        private void SetStatus(MessageType type, string text) { _statusType = type; _status = text; Debug.Log("[USD][AITuning] " + text); }
+        private void SetStatus(MessageType type, string text) { _statusType = type; _status = text; UnityEngine.Debug.Log("[USD][AITuning] " + text); }
     }
 
 }
