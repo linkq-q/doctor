@@ -225,11 +225,11 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button(USD_Loc.C("ai.generate"), GUILayout.Width(120)))
             {
-                RunSafeAction("generate", () => GenerateCurrentDraft(settings, catalog, "generate"));
+                GenerateCurrentDraft(settings, catalog, "generate");
             }
             if (GUILayout.Button(USD_Loc.C("ai.regenerate"), GUILayout.Width(120)))
             {
-                RunSafeAction("regenerate", () => GenerateCurrentDraft(settings, catalog, "regenerate"));
+                GenerateCurrentDraft(settings, catalog, "regenerate");
             }
             if (GUILayout.Button(USD_Loc.C("ai.discard"), GUILayout.Width(120)))
             {
@@ -378,7 +378,8 @@ namespace URPSceneDoctor.Editor
 
         private void GenerateCurrentDraft(USD_Settings settings, USD_LabelCatalogAsset catalog, string actionName)
         {
-            if (!ValidateFolder(_sampleFolder, out var msg)) throw new Exception(msg);
+            if (!ValidateFolder(_sampleFolder, out var msg)) { ShowError(msg); return; }
+            if (_busy) return;
 
             var sceneName = Path.GetFileName(_sampleFolder);
             var before = JsonUtility.FromJson<USD_ScanSnapshot>(SafeRead(Path.Combine(_sampleFolder, "snapshot_before.json"))) ?? new USD_ScanSnapshot();
@@ -387,21 +388,66 @@ namespace URPSceneDoctor.Editor
             var mBefore = JsonUtility.FromJson<USD_ImageMetricsFile>(SafeRead(Path.Combine(_sampleFolder, "image_metrics_before.json"))) ?? new USD_ImageMetricsFile();
             var mAfter = JsonUtility.FromJson<USD_ImageMetricsFile>(SafeRead(Path.Combine(_sampleFolder, "image_metrics_after.json"))) ?? new USD_ImageMetricsFile();
 
+            _busy = true;
             _llmStatus.MarkSending("已发送请求（Draft Labeling）...");
-            _llmStatus.MarkWaiting("正在等待 Draft Labeling 回复...");
-            _draft = GenerateDraft(settings, _sampleFolder, sceneName, catalog, before, after, patch, mBefore, mAfter);
-            _draftLoaded = true;
-            if (string.IsNullOrEmpty(_draft.error)) _llmStatus.MarkSuccess("AI 回复成功：已生成草稿。");
-            else _llmStatus.MarkFail(_draft.error);
-            _statusType = string.IsNullOrEmpty(_draft.error) ? MessageType.Info : MessageType.Warning;
-            _statusMessage = string.IsNullOrEmpty(_draft.error)
-                ? USD_Loc.T("ai.generatedOk", Path.Combine(_sampleFolder, DraftFileName))
-                : USD_Loc.T("ai.generatedWarn", _draft.error, Path.Combine(_sampleFolder, DraftFileName));
-            _lastOutputPath = Path.Combine(_sampleFolder, DraftFileName);
 
-            Debug.Log("[USD][AI] " + actionName + " clicked");
-            AppendActionLog(_sampleFolder, actionName, string.IsNullOrEmpty(_draft.error) ? "ok" : "fail", _draft.error ?? string.Empty);
-            EditorUtility.DisplayDialog(USD_Loc.T("ai.dialogTitle"), USD_Loc.T("ai.generatedDialog"), USD_Loc.T("common.ok"));
+            if (!USD_LlmClient.IsEnabled(settings))
+            {
+                _draft = USD_AiPromptTemplates.ParseLabelDraftOrFallback(string.Empty, catalog, mAfter);
+                _draft.source = "fallback-template";
+                _draft.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                _draft.error = USD_Loc.T("ai.errLlmDisabled");
+                WriteDraftFile(_sampleFolder, settings, _draft, string.Empty, string.Empty, "failed", _draft.error);
+                _draftLoaded = true;
+                _llmStatus.MarkFail(_draft.error);
+                _statusType = MessageType.Warning;
+                _statusMessage = USD_Loc.T("ai.generatedWarn", _draft.error, Path.Combine(_sampleFolder, DraftFileName));
+                _lastOutputPath = Path.Combine(_sampleFolder, DraftFileName);
+                AppendActionLog(_sampleFolder, actionName, "fail", _draft.error ?? string.Empty);
+                _busy = false;
+                AssetDatabase.Refresh();
+                return;
+            }
+
+            var messages = new List<(string role, string content)>
+            {
+                ("system", USD_AiPromptTemplates.DraftLabelingSystem(settings.promptLanguage)),
+                ("user", USD_AiPromptTemplates.DraftLabelingUser(catalog, sceneName, after, patch, mBefore, mAfter))
+            };
+
+            USD_LlmClient.ChatOnce(settings, messages,
+                onOk: text =>
+                {
+                    _draft = USD_AiPromptTemplates.ParseLabelDraftOrFallback(text, catalog, mAfter);
+                    _draft.source = "deepseek/openai-compatible";
+                    _draft.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    WriteDraftFile(_sampleFolder, settings, _draft, text, string.Empty, "generated", string.Empty);
+                    _draftLoaded = true;
+                    _llmStatus.MarkSuccess("AI 回复成功：已生成草稿。");
+                    _statusType = MessageType.Info;
+                    _statusMessage = USD_Loc.T("ai.generatedOk", Path.Combine(_sampleFolder, DraftFileName));
+                    _lastOutputPath = Path.Combine(_sampleFolder, DraftFileName);
+                    AppendActionLog(_sampleFolder, actionName, "ok", string.Empty);
+                    EditorUtility.DisplayDialog(USD_Loc.T("ai.dialogTitle"), USD_Loc.T("ai.generatedDialog"), USD_Loc.T("common.ok"));
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                },
+                onFail: err =>
+                {
+                    _draft = USD_AiPromptTemplates.ParseLabelDraftOrFallback(string.Empty, catalog, mAfter);
+                    _draft.source = "deepseek/openai-compatible";
+                    _draft.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    _draft.error = err;
+                    WriteDraftFile(_sampleFolder, settings, _draft, string.Empty, string.Empty, "failed", err);
+                    _draftLoaded = true;
+                    _llmStatus.MarkFail(err);
+                    _statusType = MessageType.Warning;
+                    _statusMessage = USD_Loc.T("ai.generatedWarn", err, Path.Combine(_sampleFolder, DraftFileName));
+                    _lastOutputPath = Path.Combine(_sampleFolder, DraftFileName);
+                    AppendActionLog(_sampleFolder, actionName, "fail", err ?? string.Empty);
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                });
         }
 
         private void AcceptDraft()
@@ -481,87 +527,128 @@ namespace URPSceneDoctor.Editor
         {
             if (!ValidateFolder(folder, out var msg)) { ShowError(msg); return; }
             if (!USD_LlmClient.IsEnabled(settings)) { ShowError(USD_Loc.T("ai.errLlmDisabled")); return; }
+            if (_busy) return;
 
-            try
+            Debug.Log("[USD][AI] Explainable summary clicked");
+            var report = SafeRead(Path.Combine(folder, "report.json"));
+            var diff = SafeRead(Path.Combine(folder, "diff.json"));
+            var delta = SafeRead(Path.Combine(folder, "deltaPatch.json"));
+            var metricsBefore = SafeRead(Path.Combine(folder, "image_metrics_before.json"));
+            var metricsAfter = SafeRead(Path.Combine(folder, "image_metrics_after.json"));
+
+            _busy = true;
+            _llmStatus.MarkSending("已发送请求（Explainable Summary）...");
+            var messages = new List<(string role, string content)>
             {
-                Debug.Log("[USD][AI] Explainable summary clicked");
-                var report = SafeRead(Path.Combine(folder, "report.json"));
-                var diff = SafeRead(Path.Combine(folder, "diff.json"));
-                var delta = SafeRead(Path.Combine(folder, "deltaPatch.json"));
-                var metricsBefore = SafeRead(Path.Combine(folder, "image_metrics_before.json"));
-                var metricsAfter = SafeRead(Path.Combine(folder, "image_metrics_after.json"));
-                _llmStatus.MarkSending("已发送请求（Explainable Summary）...");
-                _llmStatus.MarkWaiting("正在等待 Explainable Summary 回复...");
-                var res = USD_LlmClient.Chat(settings, USD_AiPromptTemplates.ExplainSystem(settings.promptLanguage), USD_AiPromptTemplates.ExplainUser(report, diff, delta, metricsBefore, metricsAfter, "{}"));
-                var outPath = Path.Combine(folder, "report_summary_ai.md");
-                var text = res.success ? res.text : "# AI Summary\n- Failed: " + res.error;
-                File.WriteAllText(outPath, text);
-                File.WriteAllText(Path.Combine(folder, "report_summary_ai_audit.json"), JsonUtility.ToJson(new AuditWrap { timestamp = DateTime.Now.ToString("s"), provider = settings.llmProvider, success = res.success, error = res.error, raw = res.raw_json }, true));
-                AppendActionLog(folder, "generate_summary", res.success ? "ok" : "fail", res.error);
-                _statusType = res.success ? MessageType.Info : MessageType.Warning;
-                _statusMessage = res.success ? USD_Loc.T("ai.summarySaved", outPath) : USD_Loc.T("ai.summaryFailed", res.error);
-                if (res.success) _llmStatus.MarkSuccess("AI 回复成功：已生成摘要。");
-                else _llmStatus.MarkFail(res.error);
-                _lastOutputPath = outPath;
-            }
-            catch (Exception e)
-            {
-                AppendActionLog(folder, "generate_summary", "fail", e.Message);
-                ShowError(e.Message);
-            }
-            AssetDatabase.Refresh();
+                ("system", USD_AiPromptTemplates.ExplainSystem(settings.promptLanguage)),
+                ("user", USD_AiPromptTemplates.ExplainUser(report, diff, delta, metricsBefore, metricsAfter, "{}"))
+            };
+
+            USD_LlmClient.ChatOnce(settings, messages,
+                onOk: text =>
+                {
+                    var outPath = Path.Combine(folder, "report_summary_ai.md");
+                    File.WriteAllText(outPath, text);
+                    File.WriteAllText(Path.Combine(folder, "report_summary_ai_audit.json"), JsonUtility.ToJson(new AuditWrap { timestamp = DateTime.Now.ToString("s"), provider = settings.llmProvider, success = true, error = string.Empty, raw = text }, true));
+                    AppendActionLog(folder, "generate_summary", "ok", string.Empty);
+                    _statusType = MessageType.Info;
+                    _statusMessage = USD_Loc.T("ai.summarySaved", outPath);
+                    _llmStatus.MarkSuccess("AI 回复成功：已生成摘要。");
+                    _lastOutputPath = outPath;
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                },
+                onFail: err =>
+                {
+                    var outPath = Path.Combine(folder, "report_summary_ai.md");
+                    File.WriteAllText(outPath, "# AI Summary
+- Failed: " + err);
+                    AppendActionLog(folder, "generate_summary", "fail", err);
+                    _statusType = MessageType.Warning;
+                    _statusMessage = USD_Loc.T("ai.summaryFailed", err);
+                    _llmStatus.MarkFail(err);
+                    _lastOutputPath = outPath;
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                });
         }
 
         private void RunRuleDraft(USD_Settings settings, string folder)
         {
             if (!ValidateFolder(folder, out var msg)) { ShowError(msg); return; }
-            try
-            {
-                Debug.Log("[USD][AI] Rule draft clicked");
-                var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
-                var selected = catalog.issues.Take(2).Select(x => x.id).ToList();
-                var snap = SafeRead(Path.Combine(folder, "snapshot_after.json"));
-                var delta = SafeRead(Path.Combine(folder, "deltaPatch.json"));
-                var metrics = SafeRead(Path.Combine(folder, "image_metrics_after.json"));
-                USD_RuleDraft draft;
-                string err = string.Empty;
+            if (_busy) return;
 
-                if (USD_LlmClient.IsEnabled(settings))
+            Debug.Log("[USD][AI] Rule draft clicked");
+            var catalog = settings.labelCatalog != null ? settings.labelCatalog : USD_LabelCatalogUtil.GetOrCreateDefault();
+            var selected = catalog.issues.Take(2).Select(x => x.id).ToList();
+            var snap = SafeRead(Path.Combine(folder, "snapshot_after.json"));
+            var delta = SafeRead(Path.Combine(folder, "deltaPatch.json"));
+            var metrics = SafeRead(Path.Combine(folder, "image_metrics_after.json"));
+
+            _busy = true;
+            if (!USD_LlmClient.IsEnabled(settings))
+            {
+                var fallback = USD_AiPromptTemplates.ParseRuleDraftOrFallback(string.Empty, selected);
+                fallback.source = "fallback-template";
+                fallback.timestamp = DateTime.Now.ToString("s");
+                fallback.error = USD_Loc.T("ai.errLlmDisabled");
+                var fallbackDir = Path.Combine(folder, "Drafts").Replace('\', '/');
+                USD_EditorUtil.EnsureFolder(fallbackDir);
+                var fallbackPath = Path.Combine(fallbackDir, "rule_draft.json");
+                File.WriteAllText(fallbackPath, JsonUtility.ToJson(fallback, true));
+                AppendActionLog(folder, "rule_draft", "fail", fallback.error);
+                _statusType = MessageType.Warning;
+                _statusMessage = USD_Loc.T("ai.ruleWarn", fallback.error, fallbackPath);
+                _llmStatus.MarkFail(fallback.error);
+                _lastOutputPath = fallbackPath;
+                _busy = false;
+                AssetDatabase.Refresh();
+                return;
+            }
+
+            _llmStatus.MarkSending("已发送请求（Rule Authoring Assist）...");
+            var messages = new List<(string role, string content)>
+            {
+                ("system", USD_AiPromptTemplates.RuleSystem(settings.promptLanguage)),
+                ("user", USD_AiPromptTemplates.RuleUser(selected, catalog, snap, delta, metrics))
+            };
+
+            USD_LlmClient.ChatOnce(settings, messages,
+                onOk: text =>
                 {
-                    _llmStatus.MarkSending("已发送请求（Rule Authoring Assist）...");
-                    _llmStatus.MarkWaiting("正在等待 Rule Authoring 回复...");
-                    var res = USD_LlmClient.Chat(settings, USD_AiPromptTemplates.RuleSystem(settings.promptLanguage), USD_AiPromptTemplates.RuleUser(selected, catalog, snap, delta, metrics));
-                    draft = res.success ? USD_AiPromptTemplates.ParseRuleDraftOrFallback(res.text, selected) : USD_AiPromptTemplates.ParseRuleDraftOrFallback(string.Empty, selected);
-                    if (!res.success) err = res.error;
-                    else _llmStatus.MarkSuccess("AI 回复成功：已生成规则草案。");
-                    File.WriteAllText(Path.Combine(folder, "rule_draft_raw.json"), res.raw_json ?? string.Empty);
-                }
-                else
+                    var draft = USD_AiPromptTemplates.ParseRuleDraftOrFallback(text, selected);
+                    draft.source = "deepseek/openai-compatible";
+                    draft.timestamp = DateTime.Now.ToString("s");
+                    var draftDir = Path.Combine(folder, "Drafts").Replace('\', '/');
+                    USD_EditorUtil.EnsureFolder(draftDir);
+                    var outPath = Path.Combine(draftDir, "rule_draft.json");
+                    File.WriteAllText(outPath, JsonUtility.ToJson(draft, true));
+                    AppendActionLog(folder, "rule_draft", "ok", string.Empty);
+                    _statusType = MessageType.Info;
+                    _statusMessage = USD_Loc.T("ai.ruleSaved", outPath);
+                    _llmStatus.MarkSuccess("AI 回复成功：已生成规则草案。");
+                    _lastOutputPath = outPath;
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                },
+                onFail: err =>
                 {
-                    draft = USD_AiPromptTemplates.ParseRuleDraftOrFallback(string.Empty, selected);
-                    err = USD_Loc.T("ai.errLlmDisabled");
+                    var draft = USD_AiPromptTemplates.ParseRuleDraftOrFallback(string.Empty, selected);
+                    draft.source = "deepseek/openai-compatible";
+                    draft.timestamp = DateTime.Now.ToString("s");
+                    draft.error = err;
+                    var draftDir = Path.Combine(folder, "Drafts").Replace('\', '/');
+                    USD_EditorUtil.EnsureFolder(draftDir);
+                    var outPath = Path.Combine(draftDir, "rule_draft.json");
+                    File.WriteAllText(outPath, JsonUtility.ToJson(draft, true));
+                    AppendActionLog(folder, "rule_draft", "fail", err);
+                    _statusType = MessageType.Warning;
+                    _statusMessage = USD_Loc.T("ai.ruleWarn", err, outPath);
                     _llmStatus.MarkFail(err);
-                }
-
-                draft.source = USD_LlmClient.IsEnabled(settings) ? "deepseek/openai-compatible" : "fallback-template";
-                draft.timestamp = DateTime.Now.ToString("s");
-                if (!string.IsNullOrEmpty(err)) draft.error = err;
-                var draftDir = Path.Combine(folder, "Drafts").Replace('\\', '/');
-                USD_EditorUtil.EnsureFolder(draftDir);
-                var outPath = Path.Combine(draftDir, "rule_draft.json");
-                File.WriteAllText(outPath, JsonUtility.ToJson(draft, true));
-                AppendActionLog(folder, "rule_draft", string.IsNullOrEmpty(err) ? "ok" : "fail", err);
-                _statusType = string.IsNullOrEmpty(err) ? MessageType.Info : MessageType.Warning;
-                _statusMessage = string.IsNullOrEmpty(err) ? USD_Loc.T("ai.ruleSaved", outPath) : USD_Loc.T("ai.ruleWarn", err, outPath);
-                if (!string.IsNullOrEmpty(err)) _llmStatus.MarkFail(err);
-                _lastOutputPath = outPath;
-            }
-            catch (Exception e)
-            {
-                AppendActionLog(folder, "rule_draft", "fail", e.Message);
-                ShowError(e.Message);
-            }
-            AssetDatabase.Refresh();
+                    _lastOutputPath = outPath;
+                    _busy = false;
+                    AssetDatabase.Refresh();
+                });
         }
 
         private void SavePairwise(string folder)

@@ -378,6 +378,7 @@ namespace URPSceneDoctor.Editor
             EditorGUILayout.LabelField(USD_Loc.T("settings.llmProvider"), EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(USD_Loc.T("help.settings.llm"), MessageType.Info);
             EditorGUILayout.PropertyField(so.FindProperty("llmProvider"), USD_Loc.C("settings.llmProvider"));
+            EditorGUILayout.PropertyField(so.FindProperty("llmEndpointMode"), USD_Loc.C("settings.llmEndpointMode"));
             EditorGUILayout.PropertyField(so.FindProperty("llmBaseUrl"), USD_Loc.C("settings.llmBaseUrl"));
             EditorGUILayout.PropertyField(so.FindProperty("llmModel"), USD_Loc.C("settings.llmModel"));
             EditorGUILayout.PropertyField(so.FindProperty("llmTimeoutSec"), USD_Loc.C("settings.llmTimeout"));

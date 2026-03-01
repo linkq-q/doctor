@@ -114,7 +114,7 @@ namespace URPSceneDoctor.Editor
                 {"ai.disabled",("LLM 未启用：请在设置中配置 Provider 与 API Key；当前可使用离线草稿兜底。","LLM disabled: configure provider and API key in Settings. Offline fallback templates remain available.")},
                 {"ai.enabled",("LLM 已启用，可生成可审计的 AI 草稿。","LLM enabled. Auditable AI drafts can be generated.")},
                 {"settings.language",("语言","Language")}, {"settings.promptLang",("提示词语言","Prompt Language")},
-                {"settings.llmProvider",("LLM 提供商","LLM Provider")}, {"settings.llmBaseUrl",("服务地址","Base URL")}, {"settings.llmModel",("模型","Model")},
+                {"settings.llmProvider",("LLM 提供商","LLM Provider")}, {"settings.llmEndpointMode",("接口模式（NoV1/V1/Auto）","Endpoint Mode (NoV1/V1/Auto)")}, {"settings.llmBaseUrl",("服务地址","Base URL")}, {"settings.llmModel",("模型","Model")},
                 {"settings.llmTimeout",("网络超时秒数","Network Timeout Seconds")}, {"settings.singleCallTimeout",("单次调用兜底超时秒数","Single-call Timeout Seconds")},
                 {"settings.llmMaxTokens",("最大 Tokens","Max Tokens")}, {"settings.llmTemp",("温度","Temperature")},
                 {"settings.showAiSendAndReceiveToast",("显示 AI 发送/接收提示","Show AI send/receive status")},

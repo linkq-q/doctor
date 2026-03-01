@@ -39,6 +39,7 @@ namespace URPSceneDoctor.Editor
 
         [Header("LLM")]
         public string llmProvider = "DeepSeek";
+        public string llmEndpointMode = "Auto";
         public string llmBaseUrl = "https://api.deepseek.com/v1";
         public string llmModel = "deepseek-chat";
         public int llmTimeoutSec = 30;

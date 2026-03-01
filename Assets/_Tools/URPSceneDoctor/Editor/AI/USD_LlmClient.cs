@@ -8,20 +8,18 @@ using UnityEngine.Networking;
 
 namespace URPSceneDoctor.Editor
 {
+    [Serializable] internal sealed class Message { public string role; public string content; }
+    [Serializable] internal sealed class Choice { public Message message; public string reasoning_content; public string finish_reason; }
+    [Serializable] internal sealed class DSResponse { public Choice[] choices; }
     [Serializable]
-    internal sealed class USD_LlmMessage { public string role; public string content; }
-    [Serializable]
-    internal sealed class USD_LlmRequest
+    internal sealed class DSRequest
     {
         public string model;
-        public List<USD_LlmMessage> messages = new List<USD_LlmMessage>();
+        public List<Message> messages = new List<Message>();
         public float temperature;
         public int max_tokens;
+        public bool stream;
     }
-
-    [Serializable] internal sealed class USD_LlmResponseChoiceMessage { public string content; }
-    [Serializable] internal sealed class USD_LlmResponseChoice { public USD_LlmResponseChoiceMessage message; }
-    [Serializable] internal sealed class USD_LlmResponse { public List<USD_LlmResponseChoice> choices; }
 
     public sealed class USD_LlmResult
     {
@@ -41,6 +39,8 @@ namespace URPSceneDoctor.Editor
     public static class USD_LlmClient
     {
         private const string ApiKeyEditorPref = "USD_LLM_API_KEY";
+        private const string EndpointNoV1 = "https://api.deepseek.com/chat/completions";
+        private const string EndpointV1 = "https://api.deepseek.com/v1/chat/completions";
 
         public static string GetApiKey() => EditorPrefs.GetString(ApiKeyEditorPref, string.Empty);
         public static void SetApiKey(string key) => EditorPrefs.SetString(ApiKeyEditorPref, key ?? string.Empty);
@@ -51,8 +51,59 @@ namespace URPSceneDoctor.Editor
             return !string.IsNullOrWhiteSpace(GetApiKey());
         }
 
-        // Compatibility shim for legacy callsites in USD_AiAssistModule / USD_BatchSamplerModule.
-        // Uses the same single-request model and timeout bounds as coroutine path.
+        public static void ChatOnce(USD_Settings settings, List<(string role, string content)> messages, Action<string> onOk, Action<string> onFail)
+        {
+            if (!IsEnabled(settings))
+            {
+                onFail?.Invoke("LLM disabled or API key missing.");
+                return;
+            }
+
+            var request = new DSRequest
+            {
+                model = string.IsNullOrWhiteSpace(settings.llmModel) ? "deepseek-chat" : settings.llmModel,
+                temperature = settings.llmTemperature,
+                max_tokens = Mathf.Max(128, settings.llmMaxTokens),
+                stream = false
+            };
+
+            if (messages != null)
+            {
+                foreach (var message in messages)
+                {
+                    request.messages.Add(new Message { role = message.role, content = message.content });
+                }
+            }
+
+            var mode = (settings.llmEndpointMode ?? "Auto").Trim();
+            if (mode != "NoV1" && mode != "V1" && mode != "Auto") mode = "Auto";
+
+            if (mode == "NoV1")
+            {
+                USD_EditorCoroutineRunner.StartCoroutineOwnerless(ChatRequestCoroutine(settings, request, EndpointNoV1, onOk, onFail, false));
+                return;
+            }
+
+            if (mode == "V1")
+            {
+                USD_EditorCoroutineRunner.StartCoroutineOwnerless(ChatRequestCoroutine(settings, request, EndpointV1, onOk, onFail, false));
+                return;
+            }
+
+            // Auto fallback: NoV1 -> V1 when network/timeout/404
+            USD_EditorCoroutineRunner.StartCoroutineOwnerless(ChatRequestCoroutine(settings, request, EndpointNoV1, onOk, firstError =>
+            {
+                if (!ShouldFallback(firstError))
+                {
+                    onFail?.Invoke(firstError);
+                    return;
+                }
+
+                USD_EditorCoroutineRunner.StartCoroutineOwnerless(ChatRequestCoroutine(settings, request, EndpointV1, onOk, secondError => onFail?.Invoke(secondError), true));
+            }, false));
+        }
+
+        // Compatibility API expected by legacy callsites.
         public static USD_LlmResult Chat(USD_Settings settings, string systemPrompt, string userPrompt)
         {
             if (!IsEnabled(settings))
@@ -60,102 +111,20 @@ namespace URPSceneDoctor.Editor
                 return new USD_LlmResult { success = false, error = "LLM disabled or API key missing." };
             }
 
-            var req = new USD_LlmRequest
+            var request = new DSRequest
             {
                 model = string.IsNullOrWhiteSpace(settings.llmModel) ? "deepseek-chat" : settings.llmModel,
                 temperature = settings.llmTemperature,
-                max_tokens = Mathf.Max(128, settings.llmMaxTokens)
+                max_tokens = Mathf.Max(128, settings.llmMaxTokens),
+                stream = false,
+                messages = new List<Message>
+                {
+                    new Message{ role = "system", content = systemPrompt },
+                    new Message{ role = "user", content = userPrompt }
+                }
             };
-            req.messages.Add(new USD_LlmMessage { role = "system", content = systemPrompt });
-            req.messages.Add(new USD_LlmMessage { role = "user", content = userPrompt });
 
-            var json = JsonUtility.ToJson(req);
-            var baseUrl = (settings.llmBaseUrl ?? "https://api.deepseek.com").TrimEnd('/');
-            var url = baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
-                ? baseUrl
-                : baseUrl + "/chat/completions";
-            var requestTimeoutSec = Mathf.Max(3, settings.llmTimeoutSec);
-            var singleCallTimeoutSec = Mathf.Max(requestTimeoutSec, settings.singleCallTimeoutSec);
-
-            var startedAt = EditorApplication.timeSinceStartup;
-            using (var uwr = new UnityWebRequest(url, "POST"))
-            {
-                var bodyRaw = Encoding.UTF8.GetBytes(json);
-                uwr.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                uwr.downloadHandler = new DownloadHandlerBuffer();
-                uwr.SetRequestHeader("Content-Type", "application/json");
-                uwr.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
-                uwr.timeout = requestTimeoutSec;
-
-                var op = uwr.SendWebRequest();
-                var timeoutTriggered = false;
-                while (!op.isDone)
-                {
-                    if (EditorApplication.timeSinceStartup - startedAt >= singleCallTimeoutSec)
-                    {
-                        timeoutTriggered = true;
-                        uwr.Abort();
-                        break;
-                    }
-                }
-
-                var elapsedMs = (long)((EditorApplication.timeSinceStartup - startedAt) * 1000);
-                var raw = uwr.downloadHandler != null ? uwr.downloadHandler.text : string.Empty;
-                var bodySnippet = string.IsNullOrEmpty(raw) ? string.Empty : raw.Substring(0, Mathf.Min(200, raw.Length));
-                var statusCode = uwr.responseCode;
-                var result = uwr.result.ToString();
-
-                if (timeoutTriggered)
-                {
-                    return new USD_LlmResult
-                    {
-                        success = false,
-                        error = $"SingleCallTimeout after {singleCallTimeoutSec}s; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
-                        timedOut = true,
-                        latencyMs = elapsedMs,
-                        statusCode = statusCode,
-                        raw_json = raw,
-                        responseSize = (raw ?? string.Empty).Length,
-                        url = url,
-                        unityResult = result,
-                        bodySnippet = bodySnippet
-                    };
-                }
-
-                if (uwr.result != UnityWebRequest.Result.Success)
-                {
-                    return new USD_LlmResult
-                    {
-                        success = false,
-                        error = $"HTTP {(int)statusCode}: {uwr.error}; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
-                        raw_json = raw,
-                        statusCode = statusCode,
-                        latencyMs = elapsedMs,
-                        responseSize = (raw ?? string.Empty).Length,
-                        url = url,
-                        unityResult = result,
-                        bodySnippet = bodySnippet
-                    };
-                }
-
-                var parsed = JsonUtility.FromJson<USD_LlmResponse>(raw);
-                var text = parsed != null && parsed.choices != null && parsed.choices.Count > 0 && parsed.choices[0].message != null
-                    ? parsed.choices[0].message.content
-                    : string.Empty;
-                return new USD_LlmResult
-                {
-                    success = !string.IsNullOrWhiteSpace(text),
-                    text = text,
-                    raw_json = raw,
-                    error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty,
-                    statusCode = statusCode,
-                    latencyMs = elapsedMs,
-                    responseSize = (raw ?? string.Empty).Length,
-                    url = url,
-                    unityResult = result,
-                    bodySnippet = bodySnippet
-                };
-            }
+            return ExecuteSync(settings, request, ResolvePrimaryEndpoint(settings));
         }
 
         public static IEnumerator ChatOnceCoroutine(USD_Settings settings, string systemPrompt, string userPrompt, Action<USD_LlmResult> onComplete)
@@ -166,115 +135,174 @@ namespace URPSceneDoctor.Editor
                 yield break;
             }
 
-            var req = new USD_LlmRequest
+            var request = new DSRequest
             {
                 model = string.IsNullOrWhiteSpace(settings.llmModel) ? "deepseek-chat" : settings.llmModel,
                 temperature = settings.llmTemperature,
-                max_tokens = Mathf.Max(128, settings.llmMaxTokens)
+                max_tokens = Mathf.Max(128, settings.llmMaxTokens),
+                stream = false,
+                messages = new List<Message>
+                {
+                    new Message{ role = "system", content = systemPrompt },
+                    new Message{ role = "user", content = userPrompt }
+                }
             };
-            req.messages.Add(new USD_LlmMessage { role = "system", content = systemPrompt });
-            req.messages.Add(new USD_LlmMessage { role = "user", content = userPrompt });
 
-            var json = JsonUtility.ToJson(req);
-            var baseUrl = (settings.llmBaseUrl ?? "https://api.deepseek.com").TrimEnd('/');
-            var url = baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
-                ? baseUrl
-                : baseUrl + "/chat/completions";
+            USD_LlmResult completed = null;
+            yield return ChatRequestCoroutine(settings, request, ResolvePrimaryEndpoint(settings), _ => { }, fail => { }, false, r => completed = r);
+            onComplete?.Invoke(completed ?? new USD_LlmResult { success = false, error = "Unknown LLM error" });
+        }
+
+        private static string ResolvePrimaryEndpoint(USD_Settings settings)
+        {
+            var mode = (settings.llmEndpointMode ?? "Auto").Trim();
+            if (mode == "NoV1") return EndpointNoV1;
+            if (mode == "V1") return EndpointV1;
+            return EndpointNoV1;
+        }
+
+        private static bool ShouldFallback(string error)
+        {
+            if (string.IsNullOrEmpty(error)) return false;
+            return error.Contains("ConnectionError") || error.Contains("SingleCallTimeout") || error.Contains("responseCode=404") || error.Contains("HTTP 404");
+        }
+
+        private static IEnumerator ChatRequestCoroutine(USD_Settings settings, DSRequest request, string endpoint, Action<string> onOk, Action<string> onFail, bool isFallback, Action<USD_LlmResult> onCompleted = null)
+        {
+            var json = JsonUtility.ToJson(request);
             var requestTimeoutSec = Mathf.Max(3, settings.llmTimeoutSec);
             var singleCallTimeoutSec = Mathf.Max(requestTimeoutSec, settings.singleCallTimeoutSec);
-
-            if (settings.verboseLogs)
-            {
-                Debug.Log($"[USD][LLM] Sending request: provider={settings.llmProvider}, model={req.model}, url={url}, timeout={requestTimeoutSec}s, singleCallTimeout={singleCallTimeoutSec}s, payloadBytes={Encoding.UTF8.GetByteCount(json)}");
-            }
-
             var startedAt = EditorApplication.timeSinceStartup;
-            using (var uwr = new UnityWebRequest(url, "POST"))
-            {
-                var bodyRaw = Encoding.UTF8.GetBytes(json);
-                uwr.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                uwr.downloadHandler = new DownloadHandlerBuffer();
-                uwr.SetRequestHeader("Content-Type", "application/json");
-                uwr.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
-                uwr.timeout = requestTimeoutSec;
 
-                var op = uwr.SendWebRequest();
+            using (var req = new UnityWebRequest(endpoint, "POST"))
+            {
+                req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.timeout = requestTimeoutSec;
+                req.SetRequestHeader("Content-Type", "application/json");
+                req.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
+
+                var op = req.SendWebRequest();
                 var timeoutTriggered = false;
                 while (!op.isDone)
                 {
                     if (EditorApplication.timeSinceStartup - startedAt >= singleCallTimeoutSec)
                     {
                         timeoutTriggered = true;
-                        uwr.Abort();
+                        req.Abort();
                         break;
                     }
 
                     yield return null;
                 }
 
-                var elapsedMs = (long)((EditorApplication.timeSinceStartup - startedAt) * 1000);
-                var raw = uwr.downloadHandler != null ? uwr.downloadHandler.text : string.Empty;
-                var bodySnippet = string.IsNullOrEmpty(raw) ? string.Empty : raw.Substring(0, Mathf.Min(200, raw.Length));
-                var statusCode = uwr.responseCode;
-                var result = uwr.result.ToString();
+                var elapsedSec = (float)(EditorApplication.timeSinceStartup - startedAt);
+                var responseBody = req.downloadHandler != null ? req.downloadHandler.text : string.Empty;
+                var bodyPrefix = string.IsNullOrEmpty(responseBody) ? string.Empty : responseBody.Substring(0, Mathf.Min(200, responseBody.Length));
+                var responseCode = req.responseCode;
+                var result = req.result.ToString();
+
+                var resultObj = new USD_LlmResult
+                {
+                    success = false,
+                    raw_json = responseBody,
+                    statusCode = responseCode,
+                    latencyMs = (long)(elapsedSec * 1000f),
+                    responseSize = responseBody.Length,
+                    url = endpoint,
+                    unityResult = result,
+                    bodySnippet = bodyPrefix
+                };
 
                 if (settings.verboseLogs)
                 {
-                    Debug.Log($"[USD][LLM] Response: status={statusCode}, result={result}, latencyMs={elapsedMs}, bytes={(raw ?? string.Empty).Length}");
+                    Debug.Log($"[USD][LLM] endpoint={(isFallback ? "fallback" : "primary")} {endpoint} | result={result} | error={req.error} | responseCode={responseCode} | elapsedSec={elapsedSec:0.###} | bodyPrefix={bodyPrefix}");
                 }
 
                 if (timeoutTriggered)
                 {
-                    onComplete?.Invoke(new USD_LlmResult
-                    {
-                        success = false,
-                        error = $"SingleCallTimeout after {singleCallTimeoutSec}s; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
-                        timedOut = true,
-                        latencyMs = elapsedMs,
-                        statusCode = statusCode,
-                        raw_json = raw,
-                        responseSize = (raw ?? string.Empty).Length,
-                        url = url,
-                        unityResult = result,
-                        bodySnippet = bodySnippet
-                    });
+                    resultObj.timedOut = true;
+                    resultObj.error = $"SingleCallTimeout after {singleCallTimeoutSec}s; endpoint={endpoint}; result={result}; responseCode={responseCode}; bodyPrefix={bodyPrefix}";
+                    onCompleted?.Invoke(resultObj);
+                    onFail?.Invoke(resultObj.error);
                     yield break;
                 }
 
-                if (uwr.result != UnityWebRequest.Result.Success)
+                if (req.result != UnityWebRequest.Result.Success)
                 {
-                    onComplete?.Invoke(new USD_LlmResult
-                    {
-                        success = false,
-                        error = $"HTTP {(int)statusCode}: {uwr.error}; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
-                        raw_json = raw,
-                        statusCode = statusCode,
-                        latencyMs = elapsedMs,
-                        responseSize = (raw ?? string.Empty).Length,
-                        url = url,
-                        unityResult = result,
-                        bodySnippet = bodySnippet
-                    });
+                    resultObj.error = $"HTTP {(int)responseCode}: {req.error}; endpoint={endpoint}; result={result}; responseCode={responseCode}; bodyPrefix={bodyPrefix}";
+                    onCompleted?.Invoke(resultObj);
+                    onFail?.Invoke(resultObj.error);
                     yield break;
                 }
 
-                var parsed = JsonUtility.FromJson<USD_LlmResponse>(raw);
-                var text = parsed != null && parsed.choices != null && parsed.choices.Count > 0 && parsed.choices[0].message != null
-                    ? parsed.choices[0].message.content
+                var parsed = JsonUtility.FromJson<DSResponse>(responseBody);
+                var text = parsed != null && parsed.choices != null && parsed.choices.Length > 0
+                    ? parsed.choices[0]?.message?.content
                     : string.Empty;
-                onComplete?.Invoke(new USD_LlmResult
+
+                if (string.IsNullOrWhiteSpace(text))
                 {
-                    success = !string.IsNullOrWhiteSpace(text),
-                    text = text,
-                    raw_json = raw,
-                    error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty,
-                    statusCode = statusCode,
-                    latencyMs = elapsedMs,
-                    responseSize = (raw ?? string.Empty).Length,
-                    url = url,
-                    unityResult = result,
-                    bodySnippet = bodySnippet
-                });
+                    resultObj.error = $"Empty response content; endpoint={endpoint}; result={result}; responseCode={responseCode}; bodyPrefix={bodyPrefix}";
+                    onCompleted?.Invoke(resultObj);
+                    onFail?.Invoke(resultObj.error);
+                    yield break;
+                }
+
+                resultObj.success = true;
+                resultObj.text = text;
+                onCompleted?.Invoke(resultObj);
+                onOk?.Invoke(text);
+            }
+        }
+
+        private static USD_LlmResult ExecuteSync(USD_Settings settings, DSRequest request, string endpoint)
+        {
+            var json = JsonUtility.ToJson(request);
+            var requestTimeoutSec = Mathf.Max(3, settings.llmTimeoutSec);
+            var singleCallTimeoutSec = Mathf.Max(requestTimeoutSec, settings.singleCallTimeoutSec);
+            var startedAt = EditorApplication.timeSinceStartup;
+            using (var req = new UnityWebRequest(endpoint, "POST"))
+            {
+                req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.timeout = requestTimeoutSec;
+                req.SetRequestHeader("Content-Type", "application/json");
+                req.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
+
+                var op = req.SendWebRequest();
+                var timeoutTriggered = false;
+                while (!op.isDone)
+                {
+                    if (EditorApplication.timeSinceStartup - startedAt >= singleCallTimeoutSec)
+                    {
+                        timeoutTriggered = true;
+                        req.Abort();
+                        break;
+                    }
+                }
+
+                var elapsedSec = (float)(EditorApplication.timeSinceStartup - startedAt);
+                var responseBody = req.downloadHandler != null ? req.downloadHandler.text : string.Empty;
+                var bodyPrefix = string.IsNullOrEmpty(responseBody) ? string.Empty : responseBody.Substring(0, Mathf.Min(200, responseBody.Length));
+                var responseCode = req.responseCode;
+                var result = req.result.ToString();
+
+                if (timeoutTriggered)
+                {
+                    return new USD_LlmResult { success = false, timedOut = true, error = $"SingleCallTimeout after {singleCallTimeoutSec}s; endpoint={endpoint}; result={result}; responseCode={responseCode}; bodyPrefix={bodyPrefix}", raw_json = responseBody, statusCode = responseCode, latencyMs = (long)(elapsedSec * 1000f), url = endpoint, unityResult = result, bodySnippet = bodyPrefix };
+                }
+
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    return new USD_LlmResult { success = false, error = $"HTTP {(int)responseCode}: {req.error}; endpoint={endpoint}; result={result}; responseCode={responseCode}; bodyPrefix={bodyPrefix}", raw_json = responseBody, statusCode = responseCode, latencyMs = (long)(elapsedSec * 1000f), url = endpoint, unityResult = result, bodySnippet = bodyPrefix };
+                }
+
+                var parsed = JsonUtility.FromJson<DSResponse>(responseBody);
+                var text = parsed != null && parsed.choices != null && parsed.choices.Length > 0
+                    ? parsed.choices[0]?.message?.content
+                    : string.Empty;
+                return new USD_LlmResult { success = !string.IsNullOrWhiteSpace(text), text = text, raw_json = responseBody, statusCode = responseCode, latencyMs = (long)(elapsedSec * 1000f), url = endpoint, unityResult = result, bodySnippet = bodyPrefix, error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty };
             }
         }
     }
