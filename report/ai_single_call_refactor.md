@@ -2,40 +2,47 @@
 
 ## 改造目标
 - 将「生成双方案(AI)」改为一次请求一次响应（single call）。
-- 去掉隐式轮询与重试请求，确保不会无限 waiting。
+- 去掉主线程阻塞等待，避免 UnityEditor 出现 busy 卡死。
+- 超时/错误时输出完整诊断信息（URL、responseCode、result、error、body片段）。
 
-## 删除/替换的轮询与等待点
+## 删除/替换的等待点
 1. `Assets/_Tools/URPSceneDoctor/Editor/AI/USD_LlmClient.cs`
-   - 删除阻塞轮询：`while (!op.isDone) { }`
-   - 替换为：`AsyncOperation.completed + ManualResetEventSlim.Wait(timeout)` 的单次等待。
+   - 删除同步阻塞等待（`ManualResetEventSlim.Wait(...)`）。
+   - 改为 `while (!op.isDone) { yield return null; }` 的协程推进，并接入 `singleCallTimeoutSec` 业务超时。
 2. `Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs`
-   - 删除 `MarkWaiting("正在等待 AI 回复...")` 与 `MarkWaiting("正在等待重试回复...")`。
-   - 删除 Force Diversity 的第二次 LLM 请求重试逻辑（原先会再次调用 `USD_LlmClient.Chat`）。
-   - 按策略改为程序性拉开 VariantB，不再发起二次请求。
+   - 按钮入口改为 `USD_EditorCoroutineRunner.StartCoroutineOwnerless(...)`。
+   - 请求结果在协程完成后统一收敛，不再阻塞 UI 线程。
 
-## 新增/调整流程
-- 新增统一入口：`GenerateProposalSingleCall()`
-  - [Send] 立即提示请求已发送
-  - 一次 `USD_LlmClient.Chat(...)`
-  - 成功：解析并提示 [OK]
-  - 失败：提示 [Fail]（包含超时/HTTP/解析失败）
-  - `finally` 里释放 `_isProposing`，确保状态可退场
+## 新流程（一次请求一次响应）
+- 点击按钮后：
+  - 立即显示 `[Send]`。
+  - 启动 EditorCoroutine（ownerless）执行单次网络请求。
+- 请求完成后：
+  - 成功解析：显示 `[OK]` 并写 proposal。
+  - 失败/超时：显示 `[Fail]`，写入 warnings，并输出完整诊断。
+- `finally` 释放 `_isProposing`，确保状态可退场。
 
-## 超时与可观测性
-- `UnityWebRequest.timeout = llmTimeoutSec`
-- 业务兜底超时：`singleCallTimeoutSec`
-- Verbose 日志包含：url/model/timeout/payload bytes/status/latency/response size
-- 失败日志包含：错误类型（HTTP/超时/解析）
-- 支持 raw response dump：`rawResponseDumpPath`（支持 `{runId}`）
+## 超时与诊断
+- `UnityWebRequest.timeout = llmTimeoutSec`（网络超时）
+- `singleCallTimeoutSec`（业务兜底超时）
+  - 触发后会 `req.Abort()`
+  - 返回失败并包含 url/responseCode/result/body 片段
+- 失败日志样例包含：
+  - `url=...`
+  - `responseCode=...`
+  - `result=...`
+  - `error=...`
+  - `body=...`
 
-## Settings 新增字段
+## Settings（已接入 UI）
 - `singleCallTimeoutSec`
 - `showAiSendAndReceiveToast`
 - `dumpRawResponseToFile`
 - `rawResponseDumpPath`
 
 ## 验证建议（Unity 编辑器内）
-1. 正常配置 API Key 后点击「生成双方案(AI)」，应看到 [Send] -> [OK]。
-2. 配置错误 baseUrl，应在超时范围内 [Fail] 退出，不再无限 waiting。
-3. 错误 API Key，提示 HTTP 401。
-4. 返回非 JSON，提示解析失败并使用兜底方案（同时写 raw dump）。
+1. 正常网络：点击「生成双方案(AI)」应看到 `[Send] -> [OK]`，Editor 不再 busy。
+2. 错误 baseUrl：应在超时窗口内 `[Fail]` 并退出 waiting。
+3. 错误 API Key：应显示 HTTP 401，日志带完整诊断。
+4. 返回非 JSON：应显示解析失败并保留 raw dump（开启时）。
+5. 超时场景：60 秒后退出并显示具体诊断，而非仅 `SingleCallTimeout`。

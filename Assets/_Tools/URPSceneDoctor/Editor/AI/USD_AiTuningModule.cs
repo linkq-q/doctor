@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -123,23 +122,42 @@ namespace URPSceneDoctor.Editor
         {
             if (_baseSnapshot == null || _baseMetrics == null) { SetStatus(MessageType.Warning, USD_Loc.T("aituning.needBase")); return; }
             if (settings == null) { _llmStatus.MarkFail("设置读取失败：USD_Settings 为空。"); SetStatus(MessageType.Error, "Settings load failed: USD_Settings is null."); return; }
+            if (_isProposing) return;
 
             _isProposing = true;
             var styleId = catalog.styles[Mathf.Clamp(_targetStyleIndex,0,catalog.styles.Count-1)].id;
             _proposal = BuildFallbackProposal(styleId, _baseMetrics.aggregate);
-            var watch = Stopwatch.StartNew();
+
+            if (USD_LlmClient.IsEnabled(settings))
+            {
+                if (settings.showAiSendAndReceiveToast)
+                {
+                    _llmStatus.MarkSending("[Send] AI请求已发送（AI Tuning）...");
+                }
+
+                UnityEngine.Debug.Log($"[USD][AITuning] LLM request sent (runId={Path.GetFileName(_runRoot)}, model={settings.llmModel})");
+            }
+            else
+            {
+                _proposal.warnings.Add("LLMDisabled: fallback used");
+                _llmStatus.MarkFail("[Fail] LLM 未启用，已使用兜底方案。");
+            }
+
+            USD_EditorCoroutineRunner.StartCoroutineOwnerless(GenerateProposalSingleCallCoroutine(settings, styleId));
+        }
+
+        private System.Collections.IEnumerator GenerateProposalSingleCallCoroutine(USD_Settings settings, string styleId)
+        {
+            USD_LlmResult res = null;
+            if (USD_LlmClient.IsEnabled(settings))
+            {
+                yield return USD_LlmClient.ChatOnceCoroutine(settings, BuildSystemPrompt(), BuildProposalPrompt(styleId), r => res = r);
+            }
 
             try
             {
-                if (USD_LlmClient.IsEnabled(settings))
+                if (res != null)
                 {
-                    if (settings.showAiSendAndReceiveToast)
-                    {
-                        _llmStatus.MarkSending("[Send] AI请求已发送（AI Tuning）...");
-                    }
-
-                    UnityEngine.Debug.Log($"[USD][AITuning] LLM request sent (runId={Path.GetFileName(_runRoot)}, model={settings.llmModel})");
-                    var res = USD_LlmClient.Chat(settings, BuildSystemPrompt(), BuildProposalPrompt(styleId));
                     if (settings.dumpRawResponseToFile)
                     {
                         DumpRawResponse(settings, res.raw_json);
@@ -151,8 +169,7 @@ namespace URPSceneDoctor.Editor
                         if (parsed != null)
                         {
                             _proposal = parsed;
-                            watch.Stop();
-                            _llmStatus.MarkSuccess($"[OK] AI回复成功（{watch.Elapsed.TotalSeconds:0.00}s）");
+                            _llmStatus.MarkSuccess($"[OK] AI回复成功（{res.latencyMs / 1000f:0.00}s）");
                             UnityEngine.Debug.Log($"[USD][AITuning] LLM response OK (status={res.statusCode}, ms={res.latencyMs})");
                         }
                         else
@@ -171,13 +188,8 @@ namespace URPSceneDoctor.Editor
                         }
 
                         _llmStatus.MarkFail($"[Fail] AI调用失败：{err}");
-                        UnityEngine.Debug.LogError($"[USD][AITuning] LLM response FAIL (status={res.statusCode}, ms={res.latencyMs}, timedOut={res.timedOut}) error={err}");
+                        UnityEngine.Debug.LogError($"[USD][AITuning] LLM response FAIL: url={res.url}, responseCode={res.statusCode}, result={res.unityResult}, error={err}, body={res.bodySnippet}");
                     }
-                }
-                else
-                {
-                    _proposal.warnings.Add("LLMDisabled: fallback used");
-                    _llmStatus.MarkFail("[Fail] LLM 未启用，已使用兜底方案。");
                 }
 
                 NormalizeByPolicy(_proposal.variantA, _baseMetrics.aggregate); NormalizeByPolicy(_proposal.variantB, _baseMetrics.aggregate);
