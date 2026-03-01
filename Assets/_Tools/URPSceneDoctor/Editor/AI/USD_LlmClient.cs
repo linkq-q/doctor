@@ -51,6 +51,113 @@ namespace URPSceneDoctor.Editor
             return !string.IsNullOrWhiteSpace(GetApiKey());
         }
 
+        // Compatibility shim for legacy callsites in USD_AiAssistModule / USD_BatchSamplerModule.
+        // Uses the same single-request model and timeout bounds as coroutine path.
+        public static USD_LlmResult Chat(USD_Settings settings, string systemPrompt, string userPrompt)
+        {
+            if (!IsEnabled(settings))
+            {
+                return new USD_LlmResult { success = false, error = "LLM disabled or API key missing." };
+            }
+
+            var req = new USD_LlmRequest
+            {
+                model = string.IsNullOrWhiteSpace(settings.llmModel) ? "deepseek-chat" : settings.llmModel,
+                temperature = settings.llmTemperature,
+                max_tokens = Mathf.Max(128, settings.llmMaxTokens)
+            };
+            req.messages.Add(new USD_LlmMessage { role = "system", content = systemPrompt });
+            req.messages.Add(new USD_LlmMessage { role = "user", content = userPrompt });
+
+            var json = JsonUtility.ToJson(req);
+            var baseUrl = (settings.llmBaseUrl ?? "https://api.deepseek.com").TrimEnd('/');
+            var url = baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
+                ? baseUrl
+                : baseUrl + "/chat/completions";
+            var requestTimeoutSec = Mathf.Max(3, settings.llmTimeoutSec);
+            var singleCallTimeoutSec = Mathf.Max(requestTimeoutSec, settings.singleCallTimeoutSec);
+
+            var startedAt = EditorApplication.timeSinceStartup;
+            using (var uwr = new UnityWebRequest(url, "POST"))
+            {
+                var bodyRaw = Encoding.UTF8.GetBytes(json);
+                uwr.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                uwr.downloadHandler = new DownloadHandlerBuffer();
+                uwr.SetRequestHeader("Content-Type", "application/json");
+                uwr.SetRequestHeader("Authorization", "Bearer " + GetApiKey());
+                uwr.timeout = requestTimeoutSec;
+
+                var op = uwr.SendWebRequest();
+                var timeoutTriggered = false;
+                while (!op.isDone)
+                {
+                    if (EditorApplication.timeSinceStartup - startedAt >= singleCallTimeoutSec)
+                    {
+                        timeoutTriggered = true;
+                        uwr.Abort();
+                        break;
+                    }
+                }
+
+                var elapsedMs = (long)((EditorApplication.timeSinceStartup - startedAt) * 1000);
+                var raw = uwr.downloadHandler != null ? uwr.downloadHandler.text : string.Empty;
+                var bodySnippet = string.IsNullOrEmpty(raw) ? string.Empty : raw.Substring(0, Mathf.Min(200, raw.Length));
+                var statusCode = uwr.responseCode;
+                var result = uwr.result.ToString();
+
+                if (timeoutTriggered)
+                {
+                    return new USD_LlmResult
+                    {
+                        success = false,
+                        error = $"SingleCallTimeout after {singleCallTimeoutSec}s; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
+                        timedOut = true,
+                        latencyMs = elapsedMs,
+                        statusCode = statusCode,
+                        raw_json = raw,
+                        responseSize = (raw ?? string.Empty).Length,
+                        url = url,
+                        unityResult = result,
+                        bodySnippet = bodySnippet
+                    };
+                }
+
+                if (uwr.result != UnityWebRequest.Result.Success)
+                {
+                    return new USD_LlmResult
+                    {
+                        success = false,
+                        error = $"HTTP {(int)statusCode}: {uwr.error}; url={url}; responseCode={statusCode}; result={result}; body={bodySnippet}",
+                        raw_json = raw,
+                        statusCode = statusCode,
+                        latencyMs = elapsedMs,
+                        responseSize = (raw ?? string.Empty).Length,
+                        url = url,
+                        unityResult = result,
+                        bodySnippet = bodySnippet
+                    };
+                }
+
+                var parsed = JsonUtility.FromJson<USD_LlmResponse>(raw);
+                var text = parsed != null && parsed.choices != null && parsed.choices.Count > 0 && parsed.choices[0].message != null
+                    ? parsed.choices[0].message.content
+                    : string.Empty;
+                return new USD_LlmResult
+                {
+                    success = !string.IsNullOrWhiteSpace(text),
+                    text = text,
+                    raw_json = raw,
+                    error = string.IsNullOrWhiteSpace(text) ? "Empty response content." : string.Empty,
+                    statusCode = statusCode,
+                    latencyMs = elapsedMs,
+                    responseSize = (raw ?? string.Empty).Length,
+                    url = url,
+                    unityResult = result,
+                    bodySnippet = bodySnippet
+                };
+            }
+        }
+
         public static IEnumerator ChatOnceCoroutine(USD_Settings settings, string systemPrompt, string userPrompt, Action<USD_LlmResult> onComplete)
         {
             if (!IsEnabled(settings))
