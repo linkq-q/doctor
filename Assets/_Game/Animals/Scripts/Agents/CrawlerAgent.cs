@@ -5,8 +5,6 @@ namespace Game.Animals
 {
     public class CrawlerAgent : AnimalAgentBase
     {
-        private static readonly int ColorId = Shader.PropertyToID("_Color");
-
         [SerializeField] private Vector2 idleTimeRange = new(0.8f, 1.8f);
         [SerializeField] private float vanishAfterFleeSeconds = 2.2f;
         [SerializeField] private float fadeDuration = 0.5f;
@@ -16,17 +14,14 @@ namespace Game.Animals
         private bool _moving;
         private float _fleeTimer;
         private bool _vanishing;
-        private MaterialPropertyBlock _propertyBlock;
 
         public override void OnSpawn()
         {
             base.OnSpawn();
-            StopAllCoroutines();
             _stateTimer = Random.Range(idleTimeRange.x, idleTimeRange.y);
             _moving = false;
             _fleeTimer = 0f;
             _vanishing = false;
-            ApplyFadeAlpha(1f);
         }
 
         protected override void Tick(float dt)
@@ -84,38 +79,26 @@ namespace Game.Animals
         private IEnumerator VanishRoutine()
         {
             _vanishing = true;
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            var mats = new Material[renderers.Length];
+            for (var i = 0; i < renderers.Length; i++) mats[i] = renderers[i].material;
 
             var t = 0f;
             while (t < fadeDuration)
             {
                 t += Time.deltaTime;
                 var alpha = 1f - Mathf.Clamp01(t / fadeDuration);
-                ApplyFadeAlpha(alpha);
+                foreach (var m in mats)
+                {
+                    if (!m.HasProperty("_Color")) continue;
+                    var c = m.color;
+                    c.a = alpha;
+                    m.color = c;
+                }
                 yield return null;
             }
 
             manager.RequestDespawn(this);
-        }
-
-        private void ApplyFadeAlpha(float alpha)
-        {
-            _propertyBlock ??= new MaterialPropertyBlock();
-            var renderers = GetComponentsInChildren<Renderer>(true);
-            foreach (var renderer in renderers)
-            {
-                var sharedMaterials = renderer.sharedMaterials;
-                for (var materialIndex = 0; materialIndex < sharedMaterials.Length; materialIndex++)
-                {
-                    var mat = sharedMaterials[materialIndex];
-                    if (!mat || !mat.HasProperty(ColorId)) continue;
-
-                    renderer.GetPropertyBlock(_propertyBlock, materialIndex);
-                    var color = mat.color;
-                    color.a = alpha;
-                    _propertyBlock.SetColor(ColorId, color);
-                    renderer.SetPropertyBlock(_propertyBlock, materialIndex);
-                }
-            }
         }
     }
 }

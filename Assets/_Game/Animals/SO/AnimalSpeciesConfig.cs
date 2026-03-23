@@ -31,6 +31,30 @@ namespace Game.Animals
         [Min(0f)] public float chaseDist = 18f;
         [Min(0f)] public float chaseGiveUpDist = 30f;
 
+        [Header("Random Scale")]
+        public bool enableRandomScale = false;
+        [Min(0.1f)] public float minScale = 0.9f;
+        [Min(0.1f)] public float maxScale = 1.1f;
+
+        [Header("Flying")]
+        [Tooltip("是否飞行生物。若为 true，刷新高度与巡航高度参数生效。")]
+        public bool isFlying = false;
+        [Min(0f)] public float spawnHeightMin = 2f;
+        [Min(0f)] public float spawnHeightMax = 5f;
+        [Min(0f)] public float cruiseHeightMin = 2f;
+        [Min(0f)] public float cruiseHeightMax = 5f;
+
+        [Header("Predation (Bear)")]
+        [Min(0f)] public float bearDetectRadius = 22f;
+        [Min(0f)] public float bearGiveUpRadius = 36f;
+        [Min(0f)] public float bearCatchDistance = 1.8f;
+        [Min(0f)] public float bearMaxChaseTime = 10f;
+        [Min(0f)] public float postCatchIdleSeconds = 2.5f;
+
+        [Header("Predation (Deer)")]
+        [Min(0.1f)] public float deerFleeSpeedMultiplier = 1.8f;
+        [Min(0f)] public float deerFleeDurationSeconds = 3.5f;
+
         [Header("Animator Param Mapping")]
         public string speedParam = "Speed";
         public string fleeBoolParam = "IsFlee";

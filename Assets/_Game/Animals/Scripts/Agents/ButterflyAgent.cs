@@ -24,7 +24,12 @@ namespace Game.Animals
 
             var wander = Quaternion.Euler(0f, t * 35f, 0f) * Vector3.forward;
             var desired = _center + (wander + drift).normalized * 1.5f;
-            desired.y = _center.y + Mathf.Lerp(0.5f, 2f, Mathf.PerlinNoise(t * 0.25f, _seed * 0.4f));
+
+            var cruiseMin = cfg.isFlying ? cfg.cruiseHeightMin : 0.5f;
+            var cruiseMax = cfg.isFlying ? cfg.cruiseHeightMax : 2f;
+            var hMin = Mathf.Min(cruiseMin, cruiseMax);
+            var hMax = Mathf.Max(cruiseMin, cruiseMax);
+            desired.y = _center.y + Mathf.Lerp(hMin, hMax, Mathf.PerlinNoise(t * 0.25f, _seed * 0.4f));
 
             var playerDist = Mathf.Sqrt(sqrDistToPlayer);
             var speed = cfg.walkSpeed;
@@ -33,6 +38,7 @@ namespace Game.Animals
                 var away = (transform.position - player.position).normalized + Random.insideUnitSphere * 0.35f;
                 away.y = 0.2f;
                 desired = transform.position + away.normalized * 2f;
+                desired.y = Mathf.Max(desired.y, _center.y + hMin);
                 speed = cfg.runSpeed;
             }
 

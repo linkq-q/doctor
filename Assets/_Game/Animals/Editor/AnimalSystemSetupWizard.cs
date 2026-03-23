@@ -31,7 +31,12 @@ namespace Game.Animals.Editor
                 GenerateSpeciesConfigs();
             }
 
-            EditorGUILayout.HelpBox("建议 Layer/Tag: Rabbit, Fox, Butterfly, Crawler。若项目无 AI Navigation，请在 Package Manager 安装 AI Navigation。", MessageType.Info);
+            if (GUILayout.Button("Create Bear/Deer Example Assets"))
+            {
+                CreateExampleSpeciesAssets();
+            }
+
+            EditorGUILayout.HelpBox("建议 Layer/Tag: Rabbit, Fox, Butterfly, Crawler, Deer, Bear。若项目无 AI Navigation，请在 Package Manager 安装 AI Navigation。", MessageType.Info);
         }
 
         private static void CreateManagerAndPool()
@@ -86,6 +91,36 @@ namespace Game.Animals.Editor
             AssetDatabase.Refresh();
         }
 
+        private void CreateExampleSpeciesAssets()
+        {
+            EnsureOutputFolder();
+            CreateExample("Species_Bear", "Bear");
+            CreateExample("Species_Deer", "Deer");
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        private void CreateExample(string fileName, string speciesId)
+        {
+            var path = $"{soFolder}/{fileName}.asset";
+            if (AssetDatabase.LoadAssetAtPath<AnimalSpeciesConfig>(path) != null)
+            {
+                return;
+            }
+
+            var so = ScriptableObject.CreateInstance<AnimalSpeciesConfig>();
+            so.speciesId = speciesId;
+            ApplyDefaults(so, speciesId);
+            AssetDatabase.CreateAsset(so, path);
+        }
+
+        private void EnsureOutputFolder()
+        {
+            if (AssetDatabase.IsValidFolder(soFolder)) return;
+            Directory.CreateDirectory(soFolder);
+            AssetDatabase.Refresh();
+        }
+
         private static void ApplyDefaults(AnimalSpeciesConfig so, string id)
         {
             so.spawnMinDist = 12f;
@@ -95,12 +130,21 @@ namespace Game.Animals.Editor
             so.despawnDist = 70f;
             so.useNavMesh = true;
             so.requiresLineOfSight = true;
+            so.enableRandomScale = true;
+            so.minScale = 0.9f;
+            so.maxScale = 1.1f;
+            so.isFlying = false;
+            so.spawnHeightMin = 2f;
+            so.spawnHeightMax = 5f;
+            so.cruiseHeightMin = 2f;
+            so.cruiseHeightMax = 5f;
 
             var key = id.ToLowerInvariant();
             if (key.Contains("butter"))
             {
                 so.maxAlive = 20;
                 so.useNavMesh = false;
+                so.isFlying = true;
                 so.walkSpeed = 1.5f;
                 so.runSpeed = 3.5f;
             }
@@ -124,6 +168,25 @@ namespace Game.Animals.Editor
                 so.runSpeed = 5.5f;
                 so.chaseDist = 22f;
                 so.chaseGiveUpDist = 35f;
+            }
+            else if (key.Contains("deer"))
+            {
+                so.maxAlive = 8;
+                so.walkSpeed = 2.2f;
+                so.runSpeed = 6f;
+                so.deerFleeSpeedMultiplier = 1.9f;
+                so.deerFleeDurationSeconds = 4f;
+            }
+            else if (key.Contains("bear"))
+            {
+                so.maxAlive = 2;
+                so.walkSpeed = 1.8f;
+                so.runSpeed = 4.8f;
+                so.bearDetectRadius = 24f;
+                so.bearGiveUpRadius = 38f;
+                so.bearCatchDistance = 2f;
+                so.bearMaxChaseTime = 12f;
+                so.postCatchIdleSeconds = 3f;
             }
             else
             {

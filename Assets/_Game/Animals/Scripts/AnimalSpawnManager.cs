@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -37,21 +36,14 @@ namespace Game.Animals
 
         private void Awake()
         {
-            if (!pool)
-            {
-                pool = FindAnyObjectByType<AnimalPool>();
-            }
-
+            if (!pool) pool = FindAnyObjectByType<AnimalPool>();
             if (!player)
             {
                 var tagged = GameObject.FindGameObjectWithTag("Player");
                 if (tagged) player = tagged.transform;
             }
 
-            if (!playerCamera)
-            {
-                playerCamera = Camera.main;
-            }
+            if (!playerCamera) playerCamera = Camera.main;
 
             _zones.AddRange(FindObjectsByType<AnimalSpawnZone>(FindObjectsSortMode.None));
             Prewarm();
@@ -60,10 +52,7 @@ namespace Game.Animals
         private void Update()
         {
             _tickTimer += Time.deltaTime;
-            if (_tickTimer < tickInterval)
-            {
-                return;
-            }
+            if (_tickTimer < tickInterval) return;
 
             var dt = _tickTimer;
             _tickTimer = 0f;
@@ -76,6 +65,7 @@ namespace Game.Animals
                     _agents.RemoveAt(i);
                     continue;
                 }
+
                 _agents[i].ManagedTick(dt);
                 opCount++;
             }
@@ -96,6 +86,7 @@ namespace Game.Animals
             {
                 _aliveBySpecies[record.cfg.speciesId] = Mathf.Max(0, _aliveBySpecies[record.cfg.speciesId] - 1);
             }
+
             _records.Remove(agent);
             _agents.Remove(agent);
             pool.Despawn(record.instance);
@@ -103,11 +94,7 @@ namespace Game.Animals
 
         private void TrySpawnInZone(AnimalSpawnZone zone, ref int opCount)
         {
-            if (!zone || zone.AliveCount >= zone.maxAliveInZone || Time.time < zone.NextSpawnTime)
-            {
-                return;
-            }
-
+            if (!zone || zone.AliveCount >= zone.maxAliveInZone || Time.time < zone.NextSpawnTime) return;
             if (!player || !zone.species.Any())
             {
                 zone.NextSpawnTime = Time.time + zone.spawnInterval;
@@ -115,10 +102,7 @@ namespace Game.Animals
             }
 
             var maxDist = zone.species.Max(s => s ? s.spawnMaxDist : 0f);
-            if (!zone.IsZoneRelevant(player.position, maxDist))
-            {
-                return;
-            }
+            if (!zone.IsZoneRelevant(player.position, maxDist)) return;
 
             var cfg = PickSpecies(zone.species);
             if (!cfg || !cfg.prefab)
@@ -134,13 +118,13 @@ namespace Game.Animals
                 return;
             }
 
-            if (!zone.TryGetSpawnPoint(out var pos, out _))
+            if (!zone.TryGetSpawnPoint(out var basePos, out _))
             {
                 zone.NextSpawnTime = Time.time + zone.spawnInterval;
                 return;
             }
 
-            if (cfg.requiresLineOfSight && !zone.PassesVisibilityGate(playerCamera, pos, cfg.spawnMinDist, cfg.spawnMaxDist))
+            if (cfg.requiresLineOfSight && !zone.PassesVisibilityGate(playerCamera, basePos, cfg.spawnMinDist, cfg.spawnMaxDist))
             {
                 zone.NextSpawnTime = Time.time + zone.spawnInterval * 0.5f;
                 return;
@@ -149,16 +133,31 @@ namespace Game.Animals
             var count = 1;
             if (zone.enableClusterSpawn && cfg.speciesId.ToLowerInvariant().Contains("butter"))
             {
-                count = UnityEngine.Random.Range(zone.clusterMin, zone.clusterMax + 1);
+                count = Random.Range(zone.clusterMin, zone.clusterMax + 1);
             }
 
             for (var i = 0; i < count && opCount < maxOpsPerTick; i++)
             {
-                SpawnOne(cfg, zone, pos + UnityEngine.Random.insideUnitSphere * 1.2f);
+                var spawnPos = GetSpawnPosition(cfg, basePos);
+                SpawnOne(cfg, zone, spawnPos);
                 opCount++;
             }
 
             zone.NextSpawnTime = Time.time + zone.spawnInterval;
+        }
+
+        private static Vector3 GetSpawnPosition(AnimalSpeciesConfig cfg, Vector3 groundPos)
+        {
+            var jitter = Random.insideUnitCircle * 1.2f;
+            var pos = groundPos + new Vector3(jitter.x, 0f, jitter.y);
+            if (cfg.isFlying)
+            {
+                var min = Mathf.Min(cfg.spawnHeightMin, cfg.spawnHeightMax);
+                var max = Mathf.Max(cfg.spawnHeightMin, cfg.spawnHeightMax);
+                pos.y = groundPos.y + Random.Range(min, max);
+            }
+
+            return pos;
         }
 
         private void SpawnOne(AnimalSpeciesConfig cfg, AnimalSpawnZone zone, Vector3 pos)
@@ -166,9 +165,16 @@ namespace Game.Animals
             if (zone.AliveCount >= zone.maxAliveInZone) return;
             if (_aliveBySpecies[cfg.speciesId] >= cfg.maxAlive) return;
 
-            var go = pool.Spawn(cfg.prefab, pos, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+            var go = pool.Spawn(cfg.prefab, pos, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
             if (!go) return;
 
+            if (cfg.enableRandomScale)
+            {
+                var min = Mathf.Min(cfg.minScale, cfg.maxScale);
+                var max = Mathf.Max(cfg.minScale, cfg.maxScale);
+                var scale = Random.Range(min, max);
+                go.transform.localScale = Vector3.one * scale;
+            }
             if (!go.TryGetComponent(out AnimalAgentBase agent))
             {
                 Debug.LogWarning($"Spawned {cfg.speciesId} lacks AnimalAgentBase and will be despawned.");
@@ -198,7 +204,7 @@ namespace Game.Animals
             }
 
             if (total <= 0f) return null;
-            var roll = UnityEngine.Random.Range(0f, total);
+            var roll = Random.Range(0f, total);
             foreach (var s in set)
             {
                 if (!s || !s.prefab) continue;
