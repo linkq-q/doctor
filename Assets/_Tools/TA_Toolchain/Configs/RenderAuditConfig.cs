@@ -36,7 +36,7 @@ namespace TA.Toolchain.RenderAudit
     {
         public RenderAuditScanMode scanMode = RenderAuditScanMode.CurrentScene;
         public RenderAuditReportFormat reportFormat = RenderAuditReportFormat.JSON;
-        public string outputDir = "Assets/_Tools/TA_Toolchain/Reports/";
+        public string outputDir = "Assets/_Tools/TA_ToolSuite/Reports/RenderAudit";
 
         [Header("Behaviors")]
         public bool pingSceneObjectsAndAssets = true;
