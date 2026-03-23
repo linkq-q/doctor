@@ -1,0 +1,82 @@
+== namespace search ==
+Assets/_Tools/URPSceneDoctor/Editor/Style/USD_StyleProfileAsset.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Style/USD_StyleProfileUtil.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/PipelinePack/USD_PipelinePackUtil.cs:13:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/PipelinePack/USD_PipelinePackModule.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/RenderAudit/USD_RenderAuditModule.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/RenderAudit/USD_RenderScanner.cs:1:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_HubWindow.cs:6:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_ToolModule.cs:3:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_DemoSceneUtil.cs:6:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_PatchApplier.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_AtmosScanner.cs:11:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_RulePackAsset.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_RuleEngine.cs:8:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_AtmosAuditModule.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Metrics/USD_MetricsRegistry.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Metrics/Providers/USD_DefaultMetricProviders.cs:3:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Metrics/USD_MetricsPanelModule.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Learning/USD_DeltaStats.cs:1:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Learning/USD_DeltaStatsUtil.cs:10:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Learning/USD_DeltaLibraryModule.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Learning/USD_DeltaLibraryAsset.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiPromptTemplates.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:8:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs:11:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_LlmClient.cs:8:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_LlmCallStatus.cs:3:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Labels/USD_LabelCatalogAsset.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Labels/USD_LabelCatalogUtil.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Labels/USD_BatchSamplerModule.cs:10:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/I18N/USD_LocalizationTableAsset.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Taste/USD_PolicyChecker.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/I18N/USD_Loc.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/I18N/USD_I18nAudit.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Taste/USD_TastePolicyUtil.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Taste/USD_TastePolicyAsset.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Tuning/USD_DeltaExtractor.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Tuning/USD_TuningModule.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_AdviceLocalizer.cs:3:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_SnapshotUtil.cs:5:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_Localization.cs:1:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:6:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_EvidencePackModule.cs:8:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_CameraPicker.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_Models.cs:4:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_ScreenshotUtil.cs:6:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_ReportUtil.cs:8:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_VisionLiteUtil.cs:7:namespace URPSceneDoctor.Editor
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_DiffUtil.cs:3:namespace URPSceneDoctor.Editor
+
+== class USD_Settings ==
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:91:    public sealed class USD_Settings : ScriptableObject
+
+== USD_Settings refs ==
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_HubWindow.cs:51:                var b = USD_Settings.GetOrCreateSettings().policyBrightnessBucket;
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_HubWindow.cs:83:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_HubWindow.cs:231:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/Hub/USD_HubWindow.cs:344:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/AtmosAudit/USD_AtmosAuditModule.cs:50:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:74:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:143:        public static USD_AiLabelDraft GenerateDraft(USD_Settings settings, string folder, string sceneName, USD_LabelCatalogAsset catalog, USD_ScanSnapshot before, USD_ScanSnapshot after, USD_DeltaPatch patch, USD_ImageMetricsFile metricsBefore, USD_ImageMetricsFile metricsAfter)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:220:        private void DrawDraftPanel(USD_Settings settings, USD_LabelCatalogAsset catalog)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:329:        private void DrawPairwisePanel(USD_Settings settings, USD_LabelCatalogAsset catalog)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:379:        private void GenerateCurrentDraft(USD_Settings settings, USD_LabelCatalogAsset catalog, string actionName)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:480:        private void RunExplainableSummary(USD_Settings settings, string folder)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:515:        private void RunRuleDraft(USD_Settings settings, string folder)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiAssistModule.cs:589:        private static void WriteDraftFile(string folder, USD_Settings settings, USD_AiLabelDraft parsed, string rawText, string rawJson, string status, string error)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs:71:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs:117:        private void Propose(USD_Settings settings, USD_LabelCatalogAsset catalog)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs:160:        private string EnforceForceDiversity(USD_Settings settings, string styleId)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_AiTuningModule.cs:303:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_LlmClient.cs:40:        public static bool IsEnabled(USD_Settings settings)
+Assets/_Tools/URPSceneDoctor/Editor/AI/USD_LlmClient.cs:46:        public static USD_LlmResult Chat(USD_Settings settings, string systemPrompt, string userPrompt)
+Assets/_Tools/URPSceneDoctor/Editor/Labels/USD_BatchSamplerModule.cs:57:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/Labels/USD_BatchSamplerModule.cs:118:        private void RunBatch(USD_HubWindow hub, USD_LabelCatalogAsset catalog, USD_Settings settings)
+Assets/_Tools/URPSceneDoctor/Editor/Evidence/USD_EvidencePackModule.cs:188:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:69:            var settings = USD_Settings.GetOrCreateSettings();
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:91:    public sealed class USD_Settings : ScriptableObject
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:118:        public static USD_Settings GetOrCreateSettings()
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:120:            const string settingsPath = "Assets/_Tools/URPSceneDoctor/Config/USD_Settings.asset";
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:121:            var settings = AssetDatabase.LoadAssetAtPath<USD_Settings>(settingsPath);
+Assets/_Tools/URPSceneDoctor/Editor/Common/USD_EditorUtil.cs:140:            settings = CreateInstance<USD_Settings>();
